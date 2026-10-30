@@ -88,3 +88,11 @@ These are real API calls. Results are in [`docs/DERISK.md`](docs/DERISK.md).
 
 ## License
 MIT
+
+## UX (v2)
+- One primary action: **Report a road** → 3-step flow (Upload → Review → Send) with a progress stepper.
+- Video **or photo** upload, optional voice note, auto location + nearest ward, "Same pothole? Upvote it" for nearby open reports.
+- Plain words ("How bad": Dangerous / Bad / Okay-ish / Minor), Hindi/English toggle, mobile-first, 44px+ tap targets.
+- Success screen: WhatsApp / X / copy-link share, 7-day reminder; **My reports** lists reminders.
+- **City map** has tabs: Map · Repairs board · Ward ranking. Technical details (SAM masks, COCO export, agent timeline) are folded away.
+- New API: `GET /nearby`, `POST /reports/{id}/upvote`, `GET /followups`; `/analyze` accepts images.

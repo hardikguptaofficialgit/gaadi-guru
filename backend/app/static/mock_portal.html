@@ -1,9 +1,20 @@
 <!doctype html><html><head><meta charset="utf-8"><title>Municipal Grievance Portal (MOCK)</title>
-<style>body{font-family:Arial;background:#eef2f7;margin:0}header{background:#123c69;color:#fff;padding:14px 24px;font-size:20px}
-.b{background:#fff;max-width:760px;margin:20px auto;padding:20px 28px;border-radius:6px}label{display:block;margin-top:10px;font-weight:bold;font-size:14px}
-input,select,textarea{width:100%;padding:7px;margin-top:4px;font-size:14px;border:1px solid #999}textarea{height:120px}
-.warn{background:#fff3cd;padding:6px 10px;font-size:13px}button{margin-top:16px;background:#1f7a1f;color:#fff;border:0;padding:10px 26px;font-size:16px}</style></head>
-<body><header>🏛️ Municipal Corporation — Public Grievance Portal <small>(local mock for demo)</small></header>
+<style>
+:root{--ink:#1f2430;--ink2:#5b6474;--accent:#3f6fd8;--glass:rgba(255,255,255,.55);--line:rgba(255,255,255,.85)}
+*{box-sizing:border-box}body{font-family:Inter,system-ui,sans-serif;background:#e6eaf0;margin:0;color:var(--ink)}
+.blob{position:fixed;z-index:-1;border-radius:50%}
+header{max-width:820px;margin:24px auto 0;padding:16px 24px;font-size:18px;font-weight:700;background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--line);border-radius:20px;box-shadow:0 6px 16px rgba(120,130,150,.14)}
+header small{font-weight:500;color:var(--ink2)}
+.b{max-width:820px;margin:16px auto 40px;padding:28px 32px;border-radius:28px;background:rgba(255,255,255,.45);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border:1px solid var(--line);box-shadow:10px 10px 24px rgba(166,175,190,.4),-10px -10px 24px rgba(255,255,255,.8)}
+label{display:block;margin-top:14px;font-weight:600;font-size:13px;color:var(--ink2)}
+input,select,textarea{width:100%;margin-top:6px;padding:12px 14px;font:inherit;font-size:14px;color:var(--ink);background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);outline:1px solid rgba(31,36,48,.08);outline-offset:-2px;border-radius:14px;box-shadow:0 1px 2px rgba(31,36,48,.06),0 6px 16px rgba(120,130,150,.14)}
+input:focus,select:focus,textarea:focus{outline:none;box-shadow:0 0 0 3px #fff,0 0 0 5px var(--accent)}
+textarea{height:130px}.warn{background:rgba(242,184,75,.22);border:1px solid rgba(242,184,75,.5);border-radius:14px;padding:10px 14px;font-size:13px}
+button{margin-top:20px;background:var(--accent);color:#fff;border:1px solid rgba(255,255,255,.35);padding:13px 26px;font:inherit;font-weight:650;font-size:15px;border-radius:16px;cursor:pointer;box-shadow:6px 6px 14px rgba(63,111,216,.28),-6px -6px 14px rgba(255,255,255,.8)}
+button:focus-visible{outline:none;box-shadow:0 0 0 3px #fff,0 0 0 5px var(--accent)}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+</style></head>
+<body><div class="blob" style="width:380px;height:380px;left:-80px;top:120px;background:#d6e0f5"></div><div class="blob" style="width:300px;height:300px;right:-60px;top:420px;background:#f3e3c4"></div><header>Municipal Corporation — Public Grievance Portal <small>(local mock for demo)</small></header>
 <div class="b"><div class="warn">Demo mock of a civic complaint form. Nothing is sent anywhere.</div>
 <form id="f" onsubmit="event.preventDefault();document.getElementById('done').textContent='SUBMITTED (mock)';">
 <label>Citizen name<input name="name" id="name"></label>

@@ -20,8 +20,15 @@ def health():
 @app.post("/analyze")
 async def analyze(video: UploadFile = File(...), lat: float | None = Form(None), lng: float | None = Form(None),
                   voice_note: UploadFile | None = File(None), ward: str | None = Form(None)):
-    tmp = pipeline.DATA / f"upload_{video.filename}"
+    tmp = pipeline.DATA / f"upload_{Path(video.filename or 'clip').name}"
     tmp.write_bytes(await video.read())
+    if (video.content_type or "").startswith("image/") or tmp.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp", ".heic"):
+        # Photo report: turn the still into a 1 s clip so the same SAM video pipeline (and cache) applies.
+        import subprocess
+        mp4 = tmp.with_suffix(".photo.mp4")
+        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-loop", "1", "-i", str(tmp), "-t", "1", "-r", "5",
+                        "-vf", "scale='min(1280,iw)':-2,format=yuv420p", "-c:v", "libx264", str(mp4)], check=True)
+        tmp.unlink(missing_ok=True); tmp = mp4
     vn = await voice_note.read() if voice_note else None
     try:
         return pipeline.run(tmp, lat, lng, vn, ward=ward)
@@ -34,7 +41,7 @@ def reports():
     out = []
     for f in sorted(pipeline.DATA.glob("*/result.json"), key=lambda p: p.stat().st_mtime, reverse=True):
         r = json.loads(f.read_text())
-        out.append({"id": r["id"], "lat": r["lat"], "lng": r["lng"], "count": len(r["potholes"]), "ward": r.get("ward"), "status": r.get("status", "reported"),
+        out.append({"id": r["id"], "lat": r["lat"], "lng": r["lng"], "count": len(r["potholes"]), "ward": r.get("ward"), "status": r.get("status", "reported"), "upvotes": r.get("upvotes", 0),
                     "worst": max((p["score"] for p in r["potholes"]), default=0)})
     return out
 
@@ -96,6 +103,9 @@ def file_complaint(rid: str, req: FileReq):
     res = wonder_agent.fill_complaint(req.portal_url or "http://127.0.0.1:8000/mock-portal", data, pipeline.DATA / rid)
     res["screenshot"] = f"/media/{rid}/wonder_final.png"
     (pipeline.DATA / rid / "wonder.json").write_text(json.dumps(res, indent=2, default=str))
+    if res.get("fields_filled", len(res.get("filled", {}))):
+        r = _load(rid); r["status"] = "promised" if r.get("followup_due") else "filed"
+        (pipeline.DATA / rid / "result.json").write_text(json.dumps(r, ensure_ascii=False, indent=2, default=str))
     return res
 
 
@@ -122,7 +132,7 @@ def cost_summary():
 def repairs():
     out = []
     for r in agent.all_reports():
-        out.append({"id": r["id"], "ward": r.get("ward") or "Unassigned", "status": r.get("status", "reported"),
+        out.append({"id": r["id"], "ward": r.get("ward") or "Unassigned", "status": r.get("status", "reported"), "upvotes": r.get("upvotes", 0),
                     "count": len(r["potholes"]), "repair_total_inr": r.get("repair_total_inr") or sum((p.get("repair") or {}).get("inr_est", 0) for p in r["potholes"]),
                     "filed_at": r.get("filed_at"), "followup_due": r.get("followup_due"), "verification": r.get("verification"),
                     "thumb": f"/media/{r['id']}/pothole_1.jpg" if r["potholes"] else None})
@@ -151,3 +161,38 @@ async def live_frame(frame: UploadFile = File(...)):
     out = [{"box": list(d.box), "conf": d.confidence, "w": d.img_w, "h": d.img_h} for d in dets]
     near = any(d.box[3] > 0.55 * d.img_h and d.box_area > 0.004 * d.img_w * d.img_h for d in dets)
     return {"detections": out, "alert": near, "spent_usd": costs.total()}
+
+
+def _km(a, b, c, d):
+    import math
+    p = math.pi / 180
+    h = math.sin((c - a) * p / 2) ** 2 + math.cos(a * p) * math.cos(c * p) * math.sin((d - b) * p / 2) ** 2
+    return 12742 * math.asin(math.sqrt(h))
+
+
+@app.get("/nearby")
+def nearby(lat: float, lng: float, radius_m: float = 75):
+    """Open reports within radius, so the UI can offer 'Same pothole? Upvote it' instead of a duplicate."""
+    out = []
+    for r in reports():
+        if r["lat"] is None or r["status"] == "fixed":
+            continue
+        d = _km(lat, lng, r["lat"], r["lng"]) * 1000
+        if d <= radius_m:
+            out.append({**r, "distance_m": round(d)})
+    return sorted(out, key=lambda x: x["distance_m"])
+
+
+@app.post("/reports/{rid}/upvote")
+def upvote(rid: str):
+    r = _load(rid)
+    r["upvotes"] = r.get("upvotes", 0) + 1
+    (pipeline.DATA / rid / "result.json").write_text(json.dumps(r, ensure_ascii=False, indent=2))
+    return {"id": rid, "upvotes": r["upvotes"]}
+
+
+@app.get("/followups")
+def followups():
+    f = pipeline.DATA / "followups.json"
+    d = json.loads(f.read_text()) if f.exists() else {}
+    return sorted([{"id": k, **v} for k, v in d.items()], key=lambda x: x["due"])

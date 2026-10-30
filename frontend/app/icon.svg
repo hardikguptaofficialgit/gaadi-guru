@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Gaadi Guru">
+  <rect x="2" y="2" width="60" height="60" rx="18" fill="#3f6fd8"/>
+  <path d="M14 54 C14 38, 50 38, 50 24 C50 16, 44 12, 38 12" fill="none" stroke="#ffffff" stroke-width="11" stroke-linecap="round"/>
+  <path d="M14 54 C14 38, 50 38, 50 24 C50 16, 44 12, 38 12" fill="none" stroke="#3f6fd8" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="4 5"/>
+  <circle cx="38" cy="12" r="0" fill="none"/>
+  <path d="M24 10 a7 7 0 0 1 14 0 c0 5.5 -7 11 -7 11 s-7 -5.5 -7 -11z" fill="#f2b84b" stroke="#3f6fd8" stroke-width="2.2"/>
+  <circle cx="31" cy="10" r="2.6" fill="#3f6fd8"/>
+</svg>

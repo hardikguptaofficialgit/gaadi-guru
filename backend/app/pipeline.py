@@ -343,6 +343,8 @@ def render_overlay(out: Path, vid: Path, potholes: list[dict], privacy: dict, fp
 def reprocess(rid: str) -> dict:
     """Re-run dedup/severity/overlay from cached SAM output (no new API spend)."""
     out = DATA / rid; r = json.loads((out / "result.json").read_text()); fps = 8; vid = out / "clip.mp4"
+    if not list(out.glob("sam_*.txt")):
+        raise FileNotFoundError(f"{rid}: no cached SAM output, refusing to overwrite result.json")
     potholes = dedup(load_dets(out), fps)
     privacy = defaultdict(list)
     for d in load_dets(out, "privacy_"): privacy[d.frame].append(d.box)
