@@ -6,7 +6,8 @@ from pathlib import Path
 import cv2, numpy as np
 from . import meta
 
-DATA = Path(__file__).resolve().parents[1] / "data"
+import os
+DATA = Path(os.environ.get("GG_DATA") or Path(__file__).resolve().parents[1] / "data")
 DATA.mkdir(exist_ok=True)
 
 HAZARDS = {  # SAM noun phrase -> (hazard label, base severity floor)

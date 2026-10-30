@@ -1,4 +1,6 @@
 "use client";
+import Icon from "./Icon";
+import { useToast } from "./ui";
 import { createContext, useContext, useEffect, useState } from "react";
 const D = {
   en: { report: "Report", mine: "My reports", map: "City map", ride: "Ride mode", cta: "Report a road", hero: "Bad road? Report it in one tap.",
@@ -34,14 +36,14 @@ export const mine = { get: (): string[] => { try { return JSON.parse(localStorag
 export function Stepper({ at }: { at: 1 | 2 | 3 }) {
   const { t } = useT();
   return <ol className="stepper" aria-label="Progress">{(["s1", "s2", "s3"] as K[]).map((k, i) =>
-    <li key={k} className={i + 1 < at ? "done" : i + 1 === at ? "on" : ""} aria-current={i + 1 === at ? "step" : undefined}><span>{i + 1 < at ? "✓" : i + 1}</span>{t(k)}</li>)}</ol>;
+    <li key={k} className={i + 1 < at ? "done" : i + 1 === at ? "on" : ""} aria-current={i + 1 === at ? "step" : undefined}><span>{i + 1 < at ? <Icon n="check" s={14} /> : i + 1}</span>{t(k)}</li>)}</ol>;
 }
+export const shareUrl = (id: string) => (typeof window !== "undefined" ? location.origin : "") + `/r/${id}`;
 export function Share({ id, text }: { id: string; text: string }) {
-  const { t } = useT(); const [ok, setOk] = useState(false);
-  const url = typeof window !== "undefined" ? `${location.origin}/report?id=${id}` : "";
-  const msg = encodeURIComponent(`${text} ${url}`);
+  const { t } = useT(); const toast = useToast();
+  const url = shareUrl(id); const msg = encodeURIComponent(`${text} ${url}`);
   return <div className="row">
-    <a className="btn" target="_blank" rel="noreferrer" href={`https://wa.me/?text=${msg}`}>{t("wa")}</a>
-    <a className="btn" target="_blank" rel="noreferrer" href={`https://x.com/intent/post?text=${msg}`}>{t("x")}</a>
-    <button className="btn" onClick={() => { navigator.clipboard?.writeText(url); setOk(true); }}>{ok ? t("copied") : t("copy")}</button></div>;
+    <a className="btn" target="_blank" rel="noreferrer" href={`https://wa.me/?text=${msg}`}><Icon n="share" s={16} />{t("wa")}</a>
+    <a className="btn" target="_blank" rel="noreferrer" href={`https://x.com/intent/post?text=${msg}`}><Icon n="share" s={16} />{t("x")}</a>
+    <button className="btn" data-testid="copy-link" onClick={() => { navigator.clipboard?.writeText(url).catch(() => {}); toast(t("copied")); }}><Icon n="copy" s={16} />{t("copy")}</button></div>;
 }

@@ -44,7 +44,11 @@ STAGE_ORDER = ["hash", "prepare", "plan", "scan", "upload", "sam", "privacy", "r
 
 @app.post("/jobs")
 async def job_start(video: UploadFile = File(...), lat: float | None = Form(None), lng: float | None = Form(None),
-                    voice_note: UploadFile | None = File(None), ward: str | None = Form(None)):
+                    voice_note: UploadFile | None = File(None), ward: str | None = Form(None), reride_of: str | None = Form(None)):
+    if reride_of:
+        o = _load(reride_of)
+        if lat is None: lat, lng = o.get("lat"), o.get("lng")
+        ward = ward or o.get("ward")
     jid = uuid.uuid4().hex[:10]
     tmp = pipeline.DATA / f"upload_{jid}_{Path(video.filename or 'clip').name}"
     tmp.write_bytes(await video.read())
@@ -67,7 +71,13 @@ async def job_start(video: UploadFile = File(...), lat: float | None = Form(None
                                 "-vf", "scale='min(1280,iw)':-2,format=yuv420p", "-c:v", "libx264", str(mp4)], check=True)
                 tmp.unlink(missing_ok=True); tmp = mp4
             r = pipeline.run(tmp, lat, lng, vn, ward=ward, progress=prog)
-            job.update(state="done", report_id=r["id"], cache_hit=bool(r.get("cache_hit")))
+            if reride_of and reride_of != r["id"]:  # Re-ride: run the verify_repair tool for real and log it on the original's timeline
+                prog("verify", "Comparing with the original report")
+                agent._log(reride_of, {"kind": "tool_call", "tool": "verify_repair", "args": {"report_id": reride_of, "reride_report_id": r["id"]}})
+                v = agent.verify_repair(reride_of, r["id"])
+                agent._log(reride_of, {"kind": "tool_result", "tool": "verify_repair", "result": v})
+                job["verification"] = v
+            job.update(state="done", report_id=r["id"], cache_hit=bool(r.get("cache_hit")), reride_of=reride_of)
         except Exception as e:
             job.update(state="error", error=str(e)[:400])
         finally:
@@ -90,7 +100,8 @@ def reports():
     for f in sorted(pipeline.DATA.glob("*/result.json"), key=lambda p: p.stat().st_mtime, reverse=True):
         r = json.loads(f.read_text())
         out.append({"id": r["id"], "lat": r["lat"], "lng": r["lng"], "count": len(r["potholes"]), "ward": r.get("ward"), "status": r.get("status", "reported"), "upvotes": r.get("upvotes", 0),
-                    "worst": max((p["score"] for p in r["potholes"]), default=0)})
+                    "worst": max((p["score"] for p in r["potholes"]), default=0), "verdict": (r.get("verification") or {}).get("verdict"),
+                    "followup_due": r.get("followup_due")})
     return out
 
 
@@ -326,3 +337,67 @@ def stats():
             "rates": {"pothole_inr_per_m2": pipeline.RATE_PER_M2["Pothole"], "min_inr": 1500, "visible_road_m2": pipeline.VISIBLE_ROAD_M2,
                       "label": "Assumption: typical urban patching rate; not a municipal quote"},
             "featured": f}
+
+
+# ---------------- ward accountability, follow-up scheduler, offline rides ----------------
+import datetime as _dt  # noqa: E402
+from . import followup  # noqa: E402
+
+
+@app.get("/wards/{ward}/accountability")
+def ward_accountability(ward: str, as_of: str | None = None):
+    today = as_of or _dt.date.today().isoformat()
+    rows = [r for r in repairs() if r["ward"] == ward]
+    if not rows:
+        raise HTTPException(404, "no reports for this ward")
+    promised = [r for r in rows if r["status"] in ("filed", "promised")]
+    overdue = [r for r in promised if r.get("followup_due") and r["followup_due"] < today]
+    esc = {k: v for k, v in followup.load().items()}
+    for r in rows: r["escalation"] = esc.get(r["id"], {}).get("escalation")
+    for r in overdue: r["days_overdue"] = (_dt.date.fromisoformat(today[:10]) - _dt.date.fromisoformat(r["followup_due"][:10])).days
+    lb = next((x for x in leaderboard() if x["ward"] == ward), {})
+    rank = [x["ward"] for x in leaderboard()].index(ward) + 1
+    return {"ward": ward, "today": today, "rank": rank, "of": len(leaderboard()), "reports": rows, "promised": len(promised), "fixed": sum(r["status"] == "fixed" for r in rows),
+            "overdue": overdue, "pending_inr": sum(r["repair_total_inr"] for r in rows if r["status"] != "fixed"),
+            "fix_rate": lb.get("fix_rate", 0), "hazards": lb.get("hazards", 0)}
+
+
+@app.post("/followups/run")
+def followups_run(today: str | None = None, llm: bool = True, rid: str | None = None):
+    """Run the follow-up scheduler now (it also runs by itself every 10 minutes). `today` lets a demo/test pretend a date."""
+    return followup.run_due(today, llm=llm, only=rid)
+
+
+@app.get("/reports/{rid}/escalation")
+def escalation(rid: str):
+    _load(rid); f = pipeline.DATA / rid / "escalation.json"
+    if not f.exists():
+        raise HTTPException(404, "no escalation drafted")
+    return json.loads(f.read_text())
+
+
+@app.post("/rides/offline")
+async def offline_ride(frames: list[UploadFile] = File(...), lat: float | None = Form(None), lng: float | None = Form(None),
+                       ward: str | None = Form(None), fps: float = Form(0.4)):
+    """Frames cached on the phone (IndexedDB) while offline: stitched into a clip and run through the normal job pipeline."""
+    import subprocess, tempfile
+    if not 1 <= len(frames) <= 240:
+        raise HTTPException(400, "send 1-240 frames")
+    d = Path(tempfile.mkdtemp(dir=pipeline.DATA, prefix="upload_off_"))
+    for i, f in enumerate(frames):
+        (d / f"{i:04d}.jpg").write_bytes(await f.read())
+    out = pipeline.DATA / f"upload_offline_{d.name}.mp4"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-framerate", "2", "-i", str(d / "%04d.jpg"), "-vf", "scale='min(1280,iw)':-2,format=yuv420p",
+                    "-r", "8", "-c:v", "libx264", str(out)], check=True)
+    import shutil; shutil.rmtree(d, ignore_errors=True)
+    up = UploadFile(file=open(out, "rb"), filename=out.name, headers={"content-type": "video/mp4"})
+    try:
+        res = await job_start(video=up, lat=lat, lng=lng, voice_note=None, ward=ward, reride_of=None)
+    finally:
+        up.file.close(); out.unlink(missing_ok=True)
+    return {**res, "frames": len(frames)}
+
+
+@app.on_event("startup")
+def _start_scheduler():
+    followup.start_loop()

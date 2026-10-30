@@ -3,18 +3,23 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { API, get, inr } from "../api";
 import { useT, mine } from "../i18n";
+import Icon from "../Icon";
+import { SkList, Empty, StatusBadge, VerdictBadge } from "../ui";
 export default function Mine() {
-  const { t, lang } = useT(); const [rows, setRows] = useState<any[] | null>(null); const [fu, setFu] = useState<any[]>([]);
-  useEffect(() => { const ids = mine.get(); get("/repairs").then((all: any[]) => setRows(ids.length ? all.filter(x => ids.includes(x.id)) : all)); get("/followups").then(setFu).catch(() => {}); }, []);
-  const st: Record<string, string> = lang === "hi" ? { reported: "रिपोर्ट हुआ", filed: "शिकायत भरी", promised: "जवाब का इंतज़ार", fixed: "ठीक हो गया" } : { reported: "Reported", filed: "Complaint filled", promised: "Waiting for repair", fixed: "Fixed" };
-  return <main className="wrap narrow stack" style={{ gap: 22, paddingTop: 12 }}>
-    <h1 className="h-page">{t("mine")}</h1>
-    {fu.length > 0 && <div className="glass stack" style={{ padding: 18, gap: 10 }}><b>🔔 {t("reminders")}</b>
-      {fu.map(f => <Link key={f.id} href={`/report?id=${f.id}`} className="row between"><span>{f.ward}</span><span className="mut">{t("due")} {f.due}</span></Link>)}</div>}
-    {rows === null ? <p className="mut">…</p> : rows.length === 0 ? <div className="card stack center" style={{ padding: 40, gap: 14 }}><img src="/logo.svg" width={56} height={56} alt="" /><p className="mut">{t("empty")}</p><Link className="btn primary" href="/new">{t("cta")}</Link></div>
-      : rows.map(r => <Link key={r.id} href={`/report?id=${r.id}`} className="card sm row" style={{ gap: 16, flexWrap: "nowrap" }}>
-        {r.thumb && <img src={API + r.thumb} alt="" style={{ width: 88, height: 66, objectFit: "cover", borderRadius: 12 }} />}
-        <div className="stack" style={{ gap: 4, flex: 1 }}><b>{r.ward || "—"}</b><span className="tiny">{r.count} {t("found")} · {inr(r.repair_total_inr)}</span></div>
-        <span className={"pill " + (r.status === "fixed" ? "LOW" : "")}>{st[r.status] || r.status}</span></Link>)}
+  const { t, lang } = useT(); const H = lang === "hi"; const [rows, setRows] = useState<any[] | null>(null); const [fu, setFu] = useState<any[]>([]); const [mineOnly, setMineOnly] = useState(false);
+  useEffect(() => { const ids = mine.get(); setMineOnly(ids.length > 0); get("/repairs").then((all: any[]) => setRows(ids.length ? all.filter(x => ids.includes(x.id)) : all)); get("/followups").then(setFu).catch(() => {}); }, []);
+  return <main className="wrap narrow page">
+    <div className="page-head"><div><h1>{t("mine")}</h1><p className="mut">{mineOnly ? (H ? "इस फ़ोन से भेजी गई रिपोर्ट।" : "Reports sent from this phone.") : (H ? "अभी इस फ़ोन से कोई नहीं — सभी रिपोर्ट दिख रही हैं।" : "None from this phone yet, so here is everyone's.")}</p></div>
+      <Link className="btn primary" href="/new"><Icon n="camera" s={16} />{t("cta")}</Link></div>
+    {fu.length > 0 && <section className="card stack gap-3" data-testid="reminders"><div className="row gap-2"><span className="ico-tile"><Icon n="bell" /></span><h3>{t("reminders")}</h3></div>
+      <div className="list">{fu.map(f => <Link key={f.id} href={`/report?id=${f.id}`} className="row between" style={{ minHeight: 44, borderTop: "1px solid var(--line)", paddingTop: "var(--s1)" }}>
+        <span className="small"><b>{f.ward}</b></span>
+        <span className="row gap-2">{f.state === "escalated" ? <span className="badge b-warn">{H ? "एस्केलेशन ड्राफ्ट तैयार" : "Escalation drafted"}</span> : f.state === "closed" ? <span className="badge b-ok">{H ? "बंद" : "Closed"}</span> : null}
+          <span className="tiny num">{t("due")} {f.due}</span></span></Link>)}</div></section>}
+    {rows === null ? <SkList n={3} /> : rows.length === 0 ? <Empty icon="camera" title={t("empty")}><Link className="btn primary" href="/new">{t("cta")}</Link></Empty>
+      : <div className="list" data-testid="mine-list">{rows.map(r => <Link key={r.id} href={`/report?id=${r.id}`} className="li">
+        {r.thumb ? <img src={API + r.thumb} alt="" /> : <span className="ph"><Icon n="video" /></span>}
+        <div className="stack gap-1 grow"><b className="small">{r.ward || "—"}</b><span className="tiny num">{r.count} {t("found")} · {inr(r.repair_total_inr)}</span></div>
+        <div className="stack gap-1" style={{ alignItems: "flex-end" }}><StatusBadge s={r.status} hi={H} /><VerdictBadge v={r.verification?.verdict} hi={H} /></div></Link>)}</div>}
   </main>;
 }

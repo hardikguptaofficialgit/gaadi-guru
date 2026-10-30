@@ -118,12 +118,16 @@ def verify_repair(report_id: str, reride_report_id: str, **_):
     sev = lambda r: sum({"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}[p["severity"]] for p in r["potholes"])
     gap = _hav((a.get("lat"), a.get("lng")), (b.get("lat"), b.get("lng")))
     if gap > 150:
-        return {"verdict": "NOT COMPARABLE", "distance_m": round(gap, 1), "note": "Re-ride is not on the same stretch (>150 m); ask the citizen to re-ride the original road."}
+        res = {"verdict": "NOT COMPARABLE", "distance_m": round(gap, 1), "note": "Re-ride is not on the same stretch (>150 m); ask the citizen to re-ride the original road."}
+        a["verification"] = {**res, "reride": reride_report_id, "at": dt.datetime.now().isoformat(timespec="seconds")}; _save(a)
+        return res
     fixed = len(b["potholes"]) < len(a["potholes"]) * 0.5 and sev(b) < sev(a) * 0.5
     seen = "pothole" in (b.get("plan", {}).get("spark_prompts") or b.get("plan", {}).get("prompts") or [])
     if fixed and seen:  # Spark still sees potholes but SAM masked none: do not claim a fix
-        return {"verdict": "INCONCLUSIVE", "distance_m": round(gap, 1), "before": {"count": len(a["potholes"])},
-                "after": {"count": len(b["potholes"])}, "note": "Muse Spark still sees a pothole on the re-ride but SAM could not mask it; please re-ride with a clearer video."}
+        res = {"verdict": "INCONCLUSIVE", "distance_m": round(gap, 1), "before": {"count": len(a["potholes"])},
+               "after": {"count": len(b["potholes"])}, "note": "Muse Spark still sees a pothole on the re-ride but SAM could not mask it; please re-ride with a clearer video."}
+        a["verification"] = {**res, "reride": reride_report_id, "at": dt.datetime.now().isoformat(timespec="seconds")}; _save(a)
+        return res
     res = {"before": {"count": len(a["potholes"]), "severity_points": sev(a)},
            "after": {"count": len(b["potholes"]), "severity_points": sev(b)},
            "distance_m": round(_hav((a.get("lat"), a.get("lng")), (b.get("lat"), b.get("lng"))), 1),

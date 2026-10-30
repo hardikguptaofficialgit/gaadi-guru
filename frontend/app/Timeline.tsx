@@ -16,23 +16,23 @@ function summary(t: string, r: any) {
 }
 export default function Timeline({ rid, rerides }: { rid: string; rerides: any[] }) {
   const [steps, setSteps] = useState<any[]>([]); const [reride, setReride] = useState("");
-  const running = steps.length > 0 && steps[steps.length - 1].kind !== "done";
+  const running = steps.length > 0 && !steps.some(s => s.kind === "done" || s.kind === "error");
   useEffect(() => { const f = () => get(`/reports/${rid}/agent`).then(setSteps).catch(() => {}); f(); const t = setInterval(f, 1500); return () => clearInterval(t); }, [rid]);
   const start = () => fetch(`${API}/reports/${rid}/agent${reride ? `?reride=${reride}` : ""}`, { method: "POST" }).then(() => setSteps([{ kind: "start", text: "Starting…" }]));
   const items: any[] = [];
   steps.forEach(s => { if (s.kind === "tool_result") { const c = [...items].reverse().find(i => i.kind === "tool_call" && i.tool === s.tool && !i.result); if (c) { c.result = s.result; c.t2 = s.t; return; } } items.push({ ...s }); });
-  return <div className="card stack" style={{ gap: 20 }}>
-    <div className="row between"><div><span className="eyebrow">Agent · Muse Spark tool loop</span><h2 style={{ marginTop: 6 }}>Civic agent timeline</h2></div>
+  return <div className="card flat stack gap-4">
+    <div className="row between"><div><span className="eyebrow">Agent · Muse Spark tool loop</span><h3 style={{ marginTop: 4 }}>Civic agent timeline</h3></div>
       <div className="row"><select value={reride} onChange={e => setReride(e.target.value)}><option value="">No re-ride</option>{rerides.map(x => <option key={x.id} value={x.id}>Re-ride {x.id}</option>)}</select>
         <button className="btn primary" disabled={running} onClick={start}>{running ? "Agent working…" : "Run agent"}</button></div></div>
     <div className="tl">{items.filter(i => i.kind !== "done").map((s, i) => {
       const isCall = s.kind === "tool_call";
       return <div key={i} className={"tl-item" + (s.result ? " res" : "") + (s.kind === "error" || s.result?.error ? " err" : "")}><span className="node" />
-        <div className="card sm" style={{ padding: 16 }}>
+        <div className="card sm">
           {isCall ? <><div className="row between"><b>{label[s.tool] || s.tool}</b><span className="tiny">{s.result ? `${((s.t2 - s.t)).toFixed(1)} s` : "running…"}</span></div>
-            <p className="mut" style={{ fontSize: 14, marginTop: 4 }}>{summary(s.tool, s.result)}</p>
+            <p className="mut small" style={{ marginTop: 4 }}>{summary(s.tool, s.result)}</p>
             {s.tool === "file_complaint" && s.result?.screenshot && <img className="media" style={{ marginTop: 10, maxHeight: 260, objectFit: "cover", objectPosition: "top" }} src={API + s.result.screenshot} alt="pre-filled portal" />}</>
-            : <><b>{s.kind === "final" ? "Summary" : s.kind === "error" ? "Error" : "Started"}</b><pre style={{ marginTop: 4, fontSize: 14 }}>{s.text}</pre></>}
+            : <><b>{s.kind === "final" ? "Summary" : s.kind === "error" ? "Error" : "Started"}</b><pre className="small" style={{ marginTop: 4 }}>{s.text}</pre></>}
         </div></div>;
     })}{!items.length && <p className="mut">Press Run agent: it analyses, dedups, prices, drafts, pre-fills the portal, and books a 7-day follow-up.</p>}</div>
   </div>;
