@@ -209,3 +209,21 @@ def transcribe(wav_bytes: bytes, languages: list[str] | None = None, keywords: l
     ms = j.get("audioDurationMs") or len(wav_bytes) / 32  # 16 kHz s16 mono = 32 bytes/ms
     costs.record("voice", ms / 3.6e6 * costs.PRICES["voice_hour"], ms=ms)
     return j
+
+
+# ---------------- test mode: GG_FAKE_META=1 swaps every billable call for an empty, free answer ----------------
+if os.environ.get("GG_FAKE_META") == "1":
+    def sam_segment(prompt, **_):  # noqa: F811
+        return [], ""
+
+    def upload_file(path, purpose="user_data"):  # noqa: F811
+        return "fake-file"
+
+    def spark_json(system, user, model=SPARK):  # noqa: F811
+        return {}
+
+    def transcribe(wav_bytes, languages=None, keywords=None):  # noqa: F811
+        return {"text": ""}
+
+    def client():  # noqa: F811
+        raise RuntimeError("GG_FAKE_META: model client disabled in tests")

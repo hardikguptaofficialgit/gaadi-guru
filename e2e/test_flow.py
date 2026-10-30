@@ -3,7 +3,8 @@ import pytest
 from playwright.sync_api import expect
 from conftest import WEB, API, CACHED
 
-spent0 = json.load(urllib.request.urlopen(API + "/costs"))["total_usd"]
+spent0 = json.load(urllib.request.urlopen("http://localhost:8000/costs"))["total_usd"]
+LIVE_A17 = json.load(urllib.request.urlopen("http://localhost:8000/reports/a17ea6e169"))
 
 
 def api(p): return json.load(urllib.request.urlopen(API + p))
@@ -33,12 +34,18 @@ def test_agent_portal_stops_before_submit(page):
     assert any(x.get("tool") == "file_complaint" and x["kind"] == "tool_result" for x in steps)
 
 
-def test_send_button_starts_agent(page):
-    """Stub the POST so no Spark spend; check the UI enters the running state."""
-    rid = "a17ea6e169"
-    page.route(f"**/reports/{rid}/agent", lambda r: r.fulfill(json={"started": True}) if r.request.method == "POST" else r.fallback())
+def test_send_button_starts_agent(page, test_api):
+    """Click Send on a fresh (unsent) copy of a report; the agent POST is stubbed (no Spark spend)."""
+    rid = "68237deffd"; f = test_api / rid / "result.json"
+    r = json.loads(f.read_text()); r["status"] = "reported"; r.pop("followup_due", None); f.write_text(json.dumps(r))
+    st = {"on": False}
+    def h(r):
+        if r.request.method == "POST": st["on"] = True; return r.fulfill(json={"started": True})
+        r.fulfill(json=[{"kind": "start"}, {"kind": "tool_call", "tool": "analyze_video", "args": {}}] if st["on"] else [])
+    page.route(f"**/reports/{rid}/agent", h)
     page.goto(WEB + f"/report?id={rid}")
-    expect(page.get_by_test_id("success")).to_be_visible()  # already sent before
+    page.get_by_test_id("send").click()
+    expect(page.get_by_test_id("agent-running")).to_be_visible()
 
 
 def test_share_and_og(page):
@@ -104,24 +111,27 @@ def test_ride_fake_camera_live(page):
 
 
 def test_ride_offline_queue_then_upload(page):
-    """Offline: frames go to IndexedDB; back online they are posted to /rides/offline (stubbed: stitching is unit-tested)."""
-    posted = {}
-    def off(r):
-        posted["n"] = r.request.post_data_buffer.count(b'name="frames"'); r.fulfill(json={"job_id": "e2efake", "frames": posted["n"]})
-    page.route("**/rides/offline", off)
-    page.route("**/jobs/e2efake", lambda r: r.fulfill(json={"id": "e2efake", "state": "done", "report_id": "a17ea6e169", "events": [], "elapsed_s": 1, "spend_usd": 0}))
+    """Offline: frames go to IndexedDB; back online they hit the REAL /rides/offline stitch + job pipeline (Meta faked server-side)."""
     page.route("**/live/frame", lambda r: r.abort())
     page.goto(WEB + "/ride")
     page.evaluate("indexedDB.deleteDatabase('gg-offline')")
     page.reload()
+    before = {r["id"] for r in api("/reports")}
     page.context.set_offline(True)
     expect(page.get_by_test_id("net-badge")).to_contain_text(re.compile("offline", re.I))
     page.get_by_test_id("ride-toggle").click()
     page.wait_for_function("document.querySelector('[data-testid=queued]') && parseInt(document.querySelector('[data-testid=queued]').innerText) >= 2", timeout=30000)
     page.get_by_test_id("ride-toggle").click()
-    page.context.set_offline(False)
+    with page.expect_response("**/rides/offline") as resp:
+        page.context.set_offline(False)
+    body = resp.value.json(); assert resp.value.ok and body["frames"] >= 2
+    for _ in range(120):
+        j = api(f"/jobs/{body['job_id']}")
+        if j["state"] != "running": break
+        time.sleep(0.5)
+    assert j["state"] == "done", j
+    assert j["report_id"] not in before and j["spend_usd"] == 0
     expect(page.get_by_test_id("offline-job")).to_be_visible(timeout=20000)
-    assert posted.get("n", 0) >= 2
 
 
 def test_hindi_toggle(page):
@@ -133,5 +143,7 @@ def test_hindi_toggle(page):
     page.evaluate("localStorage.setItem('lang','en')")
 
 
-def test_zero_spend():
+def test_zero_spend_and_live_untouched():
     assert api("/costs")["total_usd"] == spent0
+    live = json.load(urllib.request.urlopen("http://localhost:8000/reports/a17ea6e169"))
+    assert live["verification"]["at"] == LIVE_A17["verification"]["at"], "e2e mutated the live report"

@@ -34,7 +34,7 @@ FastAPI backend ──► ffmpeg normalise (≤20 s, 8 fps → cheap SAM frames)
 | `sam-3.1` | pothole segmentation and tracking in video, mask-area severity, plate and face privacy masks |
 | `muse-spark-1.3` | visual inspection planning and complaint writing |
 | `muse-voice-transcribe-1.0` | Hindi/English voice notes |
-| `muse-wonder-1.0` *(stretch)* | computer-use agent that files the complaint on the municipal portal |
+| `muse-wonder-1.0` | computer-use agent that fills the complaint on the municipal portal and stops before Submit |
 
 ## Features
 | | |
@@ -49,6 +49,38 @@ FastAPI backend ──► ffmpeg normalise (≤20 s, 8 fps → cheap SAM frames)
 | **Privacy** | Faces and plates are found by SAM 3.1 and Gaussian-blurred in every saved image and the COCO export. |
 | **COCO export** | `/reports/{id}/coco` and `/dataset/coco` export RLE masks with severity attributes. |
 | **Budget guard** | Every Meta call is priced and logged to `backend/data/costs.jsonl`, and calls are refused once the total passes $70 (`GET /costs`). The same video is cached by SHA-256 and never re-analysed. |
+
+## What's new in v4
+| | |
+|---|---|
+| **Re-ride verification** | A "Re-ride this road" button on every report compares a new ride with the original (`verify_repair`). The verdict is **fixed / not fixed / inconclusive / not comparable**, shown as badges on the report, map rings and the repairs board. If Spark still sees a pothole that SAM can't mask, the verdict is *inconclusive*, never a false "fixed". |
+| **Ward accountability** | `/map/ward?w=…` shows promised vs fixed, overdue follow-ups with days overdue, the report list, and a shareable link (WhatsApp / X / copy). API: `GET /wards/{ward}/accountability`. |
+| **Offline ride queue** | Ride mode saves frames to IndexedDB when offline, in low-network mode, or when an upload fails. Back online, they go to `POST /rides/offline`, are stitched with ffmpeg, and run through the normal job pipeline. |
+| **Follow-up job** | Every 10 minutes, `followup.run_due` checks overdue reports. Anything not verified fixed gets an **escalation draft** (Muse Spark, with a template fallback). It is draft only: `sent: false`, and nothing is ever sent. `POST /followups/run`, `GET /reports/{id}/escalation`. |
+| **Share card** | `/r/{id}` has Open Graph/Twitter tags and a 1200×630 PNG card (`next/og`). |
+| **Design system** | One set of components: buttons, inputs, cards, badges, tabs, toasts, modals, skeletons and empty states. 8px spacing, a type scale, Framer Motion page transitions, light clay + glass with no gradients, and a mobile bottom tab bar. |
+
+| Landing | Report (sent, re-ride, escalation) | Ward ranking |
+|---|---|---|
+| ![](docs/screens/v4_landing.png) | ![](docs/screens/v4_report_sent.png) | ![](docs/screens/v4_lb.png) |
+| **Ward page** | **Mobile** | **Share card** |
+| ![](docs/screens/v4_ward.png) | ![](docs/screens/v4_m_landing.png) | ![](docs/screens/og_card.png) |
+
+Demo script: [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
+
+## Tests (zero Meta spend)
+```bash
+# backend: every endpoint + all 7 agent tools + the agent loop with a fake model.
+# Runs on a temp copy of backend/data; every Meta call is blocked and a test fails if spend changes.
+.venv/bin/python -m pytest backend/tests -q
+
+# browser E2E: needs the frontend on :3000 (it calls http://localhost:8000; the tests reroute that).
+# The suite starts its own API on :8011 over a temp copy of data/ with GG_FAKE_META=1, so live reports are never touched
+# and the offline-ride test runs the real ffmpeg stitch + job pipeline with Meta faked server-side.
+.venv/bin/pip install playwright pytest && .venv/bin/python -m playwright install chromium
+.venv/bin/python -m pytest e2e -q            # E2E_VIDEO=/tmp/vid SLOW=1000 to record videos
+```
+`GG_DATA=/path` points the backend at a different data dir. `GG_FAKE_META=1` swaps every billable Meta call for an empty, free answer (tests only).
 
 ## Deploying (not done; needs accounts)
 - **Backend:** Render, Railway, Fly.io or a VM. It needs ffmpeg plus Playwright Chromium (about 400 MB), `MODEL_API_KEY` as a secret, and a persistent disk for `backend/data`. It's not a fit for Vercel functions, which have no ffmpeg/Chromium and 60 s timeouts against our 1–2 min SAM video runs.
