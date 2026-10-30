@@ -11,7 +11,7 @@ function summary(t: string, r: any) {
   if (t === "draft_complaint") return r.subject;
   if (t === "file_complaint") return `${r.fields_filled} fields filled · ${r.stop_reason === "model_done" ? "stopped before Submit" : r.stop_reason}${r.cached ? " (cached)" : ""}`;
   if (t === "schedule_followup") return `Follow-up on ${r.followup_due}`;
-  if (t === "verify_repair") return `${r.verdict}: ${r.before.count} → ${r.after.count} hazards`;
+  if (t === "verify_repair") return r.before ? `${r.verdict}: ${r.before.count} → ${r.after.count} hazards` : `${r.verdict} · ${r.note}`;
   return "";
 }
 export default function Timeline({ rid, rerides }: { rid: string; rerides: any[] }) {

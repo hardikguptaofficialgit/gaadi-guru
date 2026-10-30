@@ -114,6 +114,9 @@ def schedule_followup(report_id: str, days: int = 7, **_):
 def verify_repair(report_id: str, reride_report_id: str, **_):
     a, b = _load(report_id), _load(reride_report_id)
     sev = lambda r: sum({"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}[p["severity"]] for p in r["potholes"])
+    gap = _hav((a.get("lat"), a.get("lng")), (b.get("lat"), b.get("lng")))
+    if gap > 150:
+        return {"verdict": "NOT COMPARABLE", "distance_m": round(gap, 1), "note": "Re-ride is not on the same stretch (>150 m); ask the citizen to re-ride the original road."}
     fixed = len(b["potholes"]) < len(a["potholes"]) * 0.5 and sev(b) < sev(a) * 0.5
     res = {"before": {"count": len(a["potholes"]), "severity_points": sev(a)},
            "after": {"count": len(b["potholes"]), "severity_points": sev(b)},

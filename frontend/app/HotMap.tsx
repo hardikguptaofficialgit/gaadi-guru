@@ -9,8 +9,8 @@ export default function HotMap({ points, height = 420 }: { points: P[]; height?:
     (async () => {
       const L = (await import("leaflet")).default;
       if (!map.current && ref.current) {
-        map.current = L.map(ref.current, { scrollWheelZoom: false }).setView([20.2961, 85.8245], 12); // Bhubaneswar
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { attribution: "© OpenStreetMap © CARTO" }).addTo(map.current);
+        map.current = L.map(ref.current, { scrollWheelZoom: false }).setView([20.283, 85.8325], 13); // Bhubaneswar
+        L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors" }).addTo(map.current);
       }
       points.filter(p => p.lat != null).forEach(p => {
         const c = sevColor[sev(p.worst)];
