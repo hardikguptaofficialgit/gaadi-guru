@@ -47,6 +47,22 @@ cd frontend && npm i && NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 ```
 Requires `ffmpeg`.
 
+## Run locally (Windows)
+```powershell
+# 1. Put your key in backend\.env  (git-ignored, never commit it)
+#    MODEL_API_KEY=your_key_here
+# 2. Install ffmpeg:  winget install Gyan.FFmpeg   (then reopen the terminal)
+py -3.12 -m venv .venv
+.venv\Scripts\pip install -r backend\requirements.txt
+cd backend
+..\.venv\Scripts\uvicorn app.main:app --port 8000
+# new terminal
+cd frontend
+npm install
+$env:NEXT_PUBLIC_API_URL="http://localhost:8000"; npm run dev   # open http://localhost:3000
+```
+The key is looked up in this order: the `MODEL_API_KEY` env var → `backend/.env` → repo-root `.env` → `MODEL_API_KEY_FILE`.
+
 ## De-risk results (Oct 30, 2026)
 These are real API calls. Results are in [`docs/DERISK.md`](docs/DERISK.md).
 

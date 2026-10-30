@@ -5,11 +5,29 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import httpx
 from openai import OpenAI
+from . import costs
 
 BASE_URL = os.environ.get("META_BASE_URL", "https://api.meta.ai/v1")
 SPARK = os.environ.get("SPARK_MODEL", "muse-spark-1.3")
 SAM = os.environ.get("SAM_MODEL", "sam-3.1")
 ASR = os.environ.get("ASR_MODEL", "muse-voice-transcribe-1.0")
+
+
+def _load_dotenv() -> None:
+    """Manual .env parse (backend/.env, then repo-root .env); never overrides real env vars."""
+    here = Path(__file__).resolve()
+    for p in (here.parents[1] / ".env", here.parents[2] / ".env"):
+        if p.exists():
+            for line in p.read_text(encoding="utf-8-sig").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip().removeprefix("export ").strip()
+                os.environ.setdefault(k, v.strip().strip('"').strip("'"))
+
+
+_load_dotenv()
 
 
 def api_key() -> str:
@@ -117,6 +135,7 @@ def sam_segment(prompt: str, *, image_url: str | None = None, video_url: str | N
         "stream": True,
         "metadata": {"mask_encoding": "one_bit", "include_confidence": "true"},
     }
+    costs.guard(0.01 if image_url else 0.06)
     text = []
     with httpx.stream("POST", f"{BASE_URL}/responses", json=body, timeout=timeout, headers={
         "Authorization": f"Bearer {api_key()}", "Accept": "text/event-stream"}) as r:
@@ -137,7 +156,14 @@ def sam_segment(prompt: str, *, image_url: str | None = None, video_url: str | N
             elif ev.get("type") in ("response.failed", "error"):
                 raise RuntimeError(f"SAM error: {json.dumps(ev)[:800]}")
     raw = "".join(text)
-    return parse_sam_text(raw), raw
+    dets = parse_sam_text(raw)
+    if image_url:
+        costs.record("sam_image", costs.PRICES["sam_image"], prompt=prompt)
+    else:
+        n = raw.count("\n") + 1 if raw else 0
+        n = max(n, max((d.frame for d in dets), default=-1) + 1)
+        costs.record("sam_video", n * costs.PRICES["sam_video_frame"], prompt=prompt, frames=n)
+    return dets, raw
 
 
 def upload_file(path: Path, purpose: str = "user_data") -> str:
@@ -148,11 +174,20 @@ def upload_file(path: Path, purpose: str = "user_data") -> str:
 # ---------------- Muse Spark ----------------
 def spark_json(system: str, user: str | list, model: str = SPARK) -> dict:
     content = user if isinstance(user, list) else [{"type": "input_text", "text": user}]
+    costs.guard(0.02)
     resp = client().responses.create(model=model, instructions=system,
                                      input=[{"role": "user", "content": content}])
+    record_usage(resp, model)
     txt = resp.output_text.strip()
     m = re.search(r"\{.*\}", txt, re.S)
     return json.loads(m.group(0)) if m else {"raw": txt}
+
+
+def record_usage(resp, model: str) -> None:
+    u = getattr(resp, "usage", None)
+    i = getattr(u, "input_tokens", 0) or 0; o = getattr(u, "output_tokens", 0) or 0
+    k = "wonder" if "wonder" in model else "spark"
+    costs.record(k, i * costs.PRICES[f"{k}_in"] + o * costs.PRICES[f"{k}_out"], model=model, tin=i, tout=o)
 
 
 # ---------------- Muse Voice Transcribe ----------------
@@ -165,8 +200,12 @@ def transcribe(wav_bytes: bytes, languages: list[str] | None = None, keywords: l
         req["keywords"] = keywords
     files = {"request": (None, json.dumps(req), "application/json"),
              "audio": ("note.wav", wav_bytes, "audio/wav")}
+    costs.guard(0.03)
     r = httpx.post(f"{BASE_URL}/asr/transcribe", files=files, timeout=300,
                    headers={"Authorization": f"Bearer {api_key()}", "Accept": "application/json"})
     if r.status_code >= 400:
         raise RuntimeError(f"ASR HTTP {r.status_code}: {r.text[:800]}")
-    return r.json()
+    j = r.json()
+    ms = j.get("audioDurationMs") or len(wav_bytes) / 32  # 16 kHz s16 mono = 32 bytes/ms
+    costs.record("voice", ms / 3.6e6 * costs.PRICES["voice_hour"], ms=ms)
+    return j

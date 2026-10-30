@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Municipal Grievance Portal (MOCK)</title>
+<style>body{font-family:Arial;background:#eef2f7;margin:0}header{background:#123c69;color:#fff;padding:14px 24px;font-size:20px}
+.b{background:#fff;max-width:760px;margin:20px auto;padding:20px 28px;border-radius:6px}label{display:block;margin-top:10px;font-weight:bold;font-size:14px}
+input,select,textarea{width:100%;padding:7px;margin-top:4px;font-size:14px;border:1px solid #999}textarea{height:120px}
+.warn{background:#fff3cd;padding:6px 10px;font-size:13px}button{margin-top:16px;background:#1f7a1f;color:#fff;border:0;padding:10px 26px;font-size:16px}</style></head>
+<body><header>🏛️ Municipal Corporation — Public Grievance Portal <small>(local mock for demo)</small></header>
+<div class="b"><div class="warn">Demo mock of a civic complaint form. Nothing is sent anywhere.</div>
+<form id="f" onsubmit="event.preventDefault();document.getElementById('done').textContent='SUBMITTED (mock)';">
+<label>Citizen name<input name="name" id="name"></label>
+<label>Mobile number<input name="mobile" id="mobile"></label>
+<label>Ward / Zone<select name="ward" id="ward"><option value="">-- select --</option><option>Ward 1</option><option>Ward 7</option><option>Ward 12</option><option>Ward 23</option><option>Ward 41</option></select></label>
+<label>Category<select name="category" id="category"><option value="">-- select --</option><option>Streetlight</option><option>Garbage</option><option>Roads &amp; Potholes</option><option>Water logging</option><option>Drainage</option></select></label>
+<label>Location (lat, lng or landmark)<input name="location" id="location"></label>
+<label>Subject<input name="subject" id="subject"></label>
+<label>Description<textarea name="description" id="description"></textarea></label>
+<label>Severity<select name="severity" id="severity"><option value="">-- select --</option><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>CRITICAL</option></select></label>
+<button id="submit" type="submit">Submit Grievance</button> <span id="done"></span>
+</form></div></body></html>

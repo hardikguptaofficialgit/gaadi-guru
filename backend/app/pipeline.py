@@ -9,9 +9,19 @@ from . import meta
 DATA = Path(__file__).resolve().parents[1] / "data"
 DATA.mkdir(exist_ok=True)
 
+HAZARDS = {  # SAM noun phrase -> (hazard label, base severity floor)
+    "pothole": ("Pothole", None),
+    "open manhole": ("Open manhole", "CRITICAL"),
+    "waterlogged road": ("Waterlogging", "MEDIUM"),
+    "garbage dump": ("Garbage dump", "LOW"),
+    "broken road divider": ("Broken divider", "MEDIUM"),
+    "broken streetlight": ("Broken streetlight", "LOW"),
+}
+MAX_PHRASES = 3  # cost guard: each phrase = one SAM video pass
 PLAN_SYS = ("You are a road-safety inspector for Indian roads. Look at the frames and reply JSON only: "
-            '{"prompts":[1-3 short noun phrases for SAM to segment, e.g. "pothole"],'
-            '"road_type":str,"surface":str,"notes":str}. Always include "pothole" if any are visible.')
+            '{"prompts":[...],"road_type":str,"surface":str,"notes":str}. '
+            f"prompts: choose at most {MAX_PHRASES} phrases ONLY from this list, only if clearly visible: "
+            + json.dumps(list(HAZARDS)) + '. Always include "pothole" first.')
 REPORT_SYS = ("Write a formal civic complaint to the municipal corporation about road damage. Reply JSON only: "
               '{"subject":str,"body_en":str,"body_hi":str,"priority":"LOW|MEDIUM|HIGH|CRITICAL"}. '
               "Be factual, cite the numbers given, no exaggeration, no medical advice.")
@@ -47,10 +57,9 @@ def plan(frames) -> dict:
         p = meta.spark_json(PLAN_SYS, content)
     except Exception as e:
         p = {"error": str(e)}
-    prompts = [x for x in p.get("prompts", []) if isinstance(x, str)][:3] or ["pothole"]
-    if "pothole" not in [x.lower() for x in prompts]:
-        prompts.insert(0, "pothole")
-    p["prompts"] = prompts[:3]
+    prompts = ["pothole"] + [x.lower() for x in p.get("prompts", []) if isinstance(x, str)
+                             and x.lower() in HAZARDS and x.lower() != "pothole"]
+    p["prompts"] = list(dict.fromkeys(prompts))[:MAX_PHRASES]
     return p
 
 
@@ -68,35 +77,79 @@ def iou(a, b):
     return inter / ua if ua else 0
 
 
-def dedup(dets: list[meta.Detection], fps: float) -> list[dict]:
-    """SAM gives stable object ids across a clip; merge ids per prompt, then merge ids that
-    overlap heavily in the same frame (same pothole picked up by two phrases)."""
-    tracks: dict[str, list[meta.Detection]] = defaultdict(list)
+def overlap(a, b):
+    """Intersection over the smaller box: catches one mask nested inside another."""
+    x1, y1, x2, y2 = max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3])
+    inter = max(0, x2 - x1) * max(0, y2 - y1)
+    small = min((a[2]-a[0])*(a[3]-a[1]), (b[2]-b[0])*(b[3]-b[1]))
+    return inter / small if small else 0
+
+
+def dedup(dets: list[meta.Detection], fps: float, min_frames: int = 2, max_frame_share: float = 0.25) -> list[dict]:
+    """Count each physical pothole once.
+    1. SAM 3.1 object ids are stable across a clip -> one track per (prompt, id).
+    2. Drop flickers (< min_frames) and 'whole road' regions (box > max_frame_share of frame).
+    3. Merge tracks (from different prompts, or a re-acquired id) that sit on the same spot in the
+       frames they share: median IoU >= 0.3 or nested >= 0.7 over >= 30% of shared frames.
+    4. Merge a track that starts within 1 s of another ending, near where it was last seen
+       (SAM lost and re-found the same pothole)."""
+    tracks: dict[str, dict[int, meta.Detection]] = defaultdict(dict)
     for d in dets:
-        tracks[d.object_id].append(d)
-    items = []
-    for oid, ds in tracks.items():
-        best = max(ds, key=lambda d: d.mask_area_px or d.box_area)
-        frame_area = max(1, best.img_w * best.img_h)
-        area = best.mask_area_px or best.box_area
-        items.append({"track": oid, "frames": sorted({d.frame for d in ds}), "best": best,
-                      "area_ratio": area / frame_area, "conf": max((d.confidence or 0) for d in ds)})
-    items.sort(key=lambda x: -x["area_ratio"])
-    merged = []
-    for it in items:
-        dup = next((m for m in merged if it["best"].frame in m["frames"] and
-                    any(iou(it["best"].box, d) > 0.5 for d in [m["best"].box])), None)
-        if dup:
-            dup["frames"] = sorted(set(dup["frames"]) | set(it["frames"])); continue
-        merged.append(it)
+        cur = tracks[d.object_id].get(d.frame)
+        if not cur or d.box_area > cur.box_area:
+            tracks[d.object_id][d.frame] = d
+    keep = {}
+    for oid, fr in tracks.items():
+        any_d = next(iter(fr.values())); fa = max(1, any_d.img_w * any_d.img_h)
+        if len(fr) < min_frames:
+            continue
+        if np.median([d.box_area / fa for d in fr.values()]) > max_frame_share:
+            continue
+        keep[oid] = fr
+    ids = list(keep); parent = {i: i for i in ids}
+    def find(x):
+        while parent[x] != x: parent[x] = parent[parent[x]]; x = parent[x]
+        return x
+    for i, a in enumerate(ids):
+        for b in ids[i+1:]:
+            A, B = keep[a], keep[b]; shared = set(A) & set(B)
+            same = False
+            if shared:
+                hits = [1 for f in shared if iou(A[f].box, B[f].box) >= 0.3 or overlap(A[f].box, B[f].box) >= 0.7]
+                same = len(hits) >= max(1, 0.3 * len(shared))
+            else:
+                (e, s), (L, R) = ((max(A), min(B)), (A, B)) if max(A) < min(B) else ((max(B), min(A)), (B, A))
+                if 0 < s - e <= fps:
+                    pa, pb = L[e].box, R[s].box
+                    ca = ((pa[0]+pa[2])/2, (pa[1]+pa[3])/2); cb = ((pb[0]+pb[2])/2, (pb[1]+pb[3])/2)
+                    same = math.dist(ca, cb) < 0.15 * L[e].img_w
+            if same:
+                parent[find(b)] = find(a)
+    groups = defaultdict(list)
+    for oid in ids: groups[find(oid)].append(oid)
     out = []
-    for i, m in enumerate(merged, 1):
-        lvl, score = severity(m["area_ratio"], len(m["frames"]))
-        b = m["best"]
-        out.append({"id": i, "sam_track": m["track"], "first_seen_s": round(m["frames"][0] / fps, 2),
-                    "best_frame": b.frame, "frames_seen": len(m["frames"]), "box": b.box,
-                    "area_ratio": round(m["area_ratio"], 4), "confidence": round(m["conf"], 3),
+    for members in groups.values():
+        allf = {f: d for m in members for f, d in keep[m].items()}
+        ds = [d for m in members for d in keep[m].values()]
+        fa = max(1, ds[0].img_w * ds[0].img_h)
+        sane = [d for d in ds if d.box_area / fa <= max_frame_share] or ds  # ignore frames where SAM grabbed the whole road
+        best = max(sane, key=lambda d: d.mask_area_px or d.box_area)
+        frames = sorted(allf)
+        ar = (best.mask_area_px or best.box_area) / fa
+        lvl, score = severity(ar, len(frames))
+        phrases = [m.split(":")[0] for m in members]
+        phrase = next((ph for ph in phrases if ph != "pothole" and ph in HAZARDS), phrases[0])
+        hazard, floor = HAZARDS.get(phrase, ("Pothole", None))
+        if "pothole" in phrase: hazard, floor = "Pothole", None
+        order = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        if floor and order.index(floor) > order.index(lvl): lvl = floor
+        out.append({"hazard": hazard, "sam_tracks": sorted(members), "sam_track": members[0], "first_seen_s": round(frames[0] / fps, 2),
+                    "best_frame": best.frame, "frames_seen": len(frames), "box": best.box,
+                    "track_boxes": {f: list(allf[f].box) for f in frames},
+                    "area_ratio": round(ar, 4), "confidence": round(max((d.confidence or 0) for d in ds), 3),
                     "severity": lvl, "score": score})
+    out.sort(key=lambda x: -x["score"])
+    for i, o in enumerate(out, 1): o["id"] = i
     return out
 
 
@@ -119,13 +172,47 @@ def privacy_blur(img: np.ndarray, sam_boxes: list | None = None) -> np.ndarray:
     return img
 
 
+# Repair cost model (assumptions, documented in README):
+#  visible road surface in a forward bike/dash frame ~ 30 m2 near-field; pothole area = area_ratio * 30 m2
+#  patching (cold-mix / hot-mix + edge cutting + tack coat) ~ Rs 1,800 per m2, min Rs 1,500 per site
+VISIBLE_ROAD_M2 = 30.0
+RATE_PER_M2 = {"Pothole": 1800, "Open manhole": 6500, "Waterlogging": 900, "Garbage dump": 400,
+               "Broken divider": 3000, "Broken streetlight": 0}
+FIXED = {"Broken streetlight": 4500, "Open manhole": 3500}
+
+
+def repair_estimate(ph: dict) -> dict:
+    hz = ph.get("hazard", "Pothole"); m2 = round(ph["area_ratio"] * VISIBLE_ROAD_M2, 2)
+    inr = FIXED.get(hz, 0) + m2 * RATE_PER_M2.get(hz, 1800)
+    inr = max(1500, round(inr, -2))
+    return {"area_m2_est": m2, "inr_est": int(inr), "basis": f"{m2} m2 x Rs {RATE_PER_M2.get(hz,1800)}/m2 (+fixed {FIXED.get(hz,0)})"}
+
+
 def frame_at(video: Path, idx: int) -> np.ndarray | None:
     cap = cv2.VideoCapture(str(video)); cap.set(cv2.CAP_PROP_POS_FRAMES, idx); ok, f = cap.read(); cap.release()
     return f if ok else None
 
 
+def video_hash(path: Path) -> str:
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""): h.update(chunk)
+    return h.hexdigest()[:16]
+
+
+def cached(vhash: str) -> dict | None:
+    for f in DATA.glob("*/result.json"):
+        r = json.loads(f.read_text())
+        if r.get("video_hash") == vhash: return r
+    return None
+
+
 def run(upload: Path, lat: float | None = None, lng: float | None = None, voice_note: bytes | None = None,
-        blur_with_sam: bool = True) -> dict:
+        blur_with_sam: bool = True, ward: str | None = None, force: bool = False) -> dict:
+    vhash = video_hash(upload)
+    if not force and (hit := cached(vhash)):
+        hit["cache_hit"] = True; return hit  # never pay SAM twice for the same video
     rid = uuid.uuid4().hex[:10]; out = DATA / rid; out.mkdir(parents=True)
     fps = 8
     vid = to_h264(upload, out / "clip.mp4", fps=fps)
@@ -134,7 +221,8 @@ def run(upload: Path, lat: float | None = None, lng: float | None = None, voice_
     dets, sam_runs = [], []
     for phrase in p["prompts"]:
         try:
-            d, _ = meta.sam_segment(phrase, file_id=fid)
+            d, raw = meta.sam_segment(phrase, file_id=fid)
+            (out / f"sam_{phrase.replace(' ', '_')}.txt").write_text(raw)
             for x in d: x.object_id = f"{phrase}:{x.object_id}"
             dets += d; sam_runs.append({"prompt": phrase, "detections": len(d)})
         except Exception as e:
@@ -144,9 +232,12 @@ def run(upload: Path, lat: float | None = None, lng: float | None = None, voice_
     if blur_with_sam:
         for phrase in ("license plate", "human face"):
             try:
-                for x in meta.sam_segment(phrase, file_id=fid)[0]: privacy[x.frame].append(x.box)
+                pd, raw = meta.sam_segment(phrase, file_id=fid)
+                (out / f"privacy_{phrase.replace(' ', '_')}.txt").write_text(raw)
+                for x in pd: privacy[x.frame].append(x.box)
             except Exception:
                 pass
+    render_overlay(out, vid, potholes, privacy, fps)
     for ph in potholes:
         f = frame_at(vid, ph["best_frame"])
         if f is None: continue
@@ -165,13 +256,105 @@ def run(upload: Path, lat: float | None = None, lng: float | None = None, voice_
             voice = meta.transcribe(wav.read_bytes(), ["Hindi", "English"], ["gaddha", "pothole", "sadak"])
         except Exception as e:
             voice = {"error": str(e)[:300]}
-    facts = {"potholes": [{k: v for k, v in x.items() if k not in ("box", "image")} for x in potholes],
+    facts = {"potholes": [{k: v for k, v in x.items() if k not in ("box", "image", "track_boxes", "sam_tracks")} for x in potholes],
              "location": {"lat": lat, "lng": lng}, "road": p, "citizen_voice_note": (voice or {}).get("transcript")}
     try:
         report = meta.spark_json(REPORT_SYS, json.dumps(facts))
     except Exception as e:
         report = {"error": str(e)[:300]}
-    result = {"id": rid, "lat": lat, "lng": lng, "plan": p, "sam_runs": sam_runs, "potholes": potholes,
-              "voice": voice, "report": report, "video": f"/media/{rid}/clip.mp4"}
+    for ph in potholes: ph["repair"] = repair_estimate(ph)
+    result = {"id": rid, "video_hash": vhash, "ward": ward, "status": "reported", "lat": lat, "lng": lng, "plan": p, "sam_runs": sam_runs, "potholes": potholes,
+              "voice": voice, "report": report, "video": f"/media/{rid}/clip.mp4",
+              "overlay": f"/media/{rid}/overlay.mp4", "overlay_gif": f"/media/{rid}/overlay.gif"}
     (out / "result.json").write_text(json.dumps(result, indent=2, default=str))
     return result
+
+
+SEV_BGR = {"LOW": (0, 200, 0), "MEDIUM": (0, 210, 255), "HIGH": (0, 130, 255), "CRITICAL": (40, 40, 230)}
+
+
+def mask_full(d: meta.Detection, shape) -> np.ndarray | None:
+    """Place SAM's box-local raster into a full-frame uint8 mask."""
+    if not d.mask_payload:
+        return None
+    try:
+        from meta_sam_parser import SegmentationMask, decode_mask_to_raster
+        h, w = d.mask_hw
+        enc = "one_bit" if d.mask_enc == "!" else "lossless"
+        r = np.frombuffer(decode_mask_to_raster(SegmentationMask(enc, d.mask_enc + d.mask_payload, w, h)), np.uint8).reshape(h, w)
+    except Exception:
+        return None
+    H, W = shape[:2]; x1, y1, x2, y2 = [int(round(v)) for v in d.box]
+    x1, y1, x2, y2 = max(0, x1), max(0, y1), min(W, x2), min(H, y2)
+    m = np.zeros((H, W), np.uint8)
+    if x2 > x1 and y2 > y1:
+        m[y1:y2, x1:x2] = cv2.resize(r * 255, (x2 - x1, y2 - y1), interpolation=cv2.INTER_NEAREST)
+    return m
+
+
+def load_dets(out: Path, prefix: str = "sam_") -> list[meta.Detection]:
+    dets = []
+    for f in sorted(out.glob(f"{prefix}*.txt")):
+        phrase = f.stem[len(prefix):].replace("_", " ")
+        for d in meta.parse_sam_text(f.read_text()):
+            d.object_id = f"{phrase}:{d.object_id}"; dets.append(d)
+    return dets
+
+
+def render_overlay(out: Path, vid: Path, potholes: list[dict], privacy: dict, fps: float) -> None:
+    """Demo video: privacy blur + translucent SAM masks + severity outlines + live counter."""
+    dets = load_dets(out)
+    by_track = {t: p for p in potholes for t in p["sam_tracks"]}
+    per_frame = defaultdict(list)
+    for d in dets:
+        if d.object_id in by_track: per_frame[d.frame].append((d, by_track[d.object_id]))
+    cap = cv2.VideoCapture(str(vid)); W = int(cap.get(3)); H = int(cap.get(4))
+    raw = out / "overlay_raw.mp4"
+    vw = cv2.VideoWriter(str(raw), cv2.VideoWriter_fourcc(*"mp4v"), fps, (W, H))
+    seen = set(); i = 0
+    while True:
+        ok, f = cap.read()
+        if not ok: break
+        f = privacy_blur(f, privacy.get(i)) if privacy.get(i) else f
+        layer = f.copy()
+        for d, ph in per_frame.get(i, []):
+            col = SEV_BGR[ph["severity"]]; seen.add(ph["id"])
+            m = mask_full(d, f.shape)
+            x1, y1, x2, y2 = map(int, d.box)
+            if m is not None:
+                layer[m > 0] = col
+                cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                cv2.drawContours(f, cs, -1, col, 2)
+            else:
+                cv2.rectangle(f, (x1, y1), (x2, y2), col, 2)
+            cv2.putText(f, f"#{ph['id']} {ph['severity']}", (x1, max(18, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, col, 2)
+        f = cv2.addWeighted(layer, 0.35, f, 0.65, 0)
+        cv2.rectangle(f, (0, 0), (W, 34), (20, 20, 20), -1)
+        cv2.putText(f, f"GAADI GURU  |  SAM 3.1  |  potholes: {len(seen)}", (10, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (3, 183, 255), 2)
+        vw.write(f); i += 1
+    cap.release(); vw.release()
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(raw), "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                    "-movflags", "+faststart", str(out / "overlay.mp4")], check=True)
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(out / "overlay.mp4"), "-vf",
+                    "fps=6,scale=480:-2:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse", str(out / "overlay.gif")], check=True)
+    raw.unlink(missing_ok=True)
+
+
+def reprocess(rid: str) -> dict:
+    """Re-run dedup/severity/overlay from cached SAM output (no new API spend)."""
+    out = DATA / rid; r = json.loads((out / "result.json").read_text()); fps = 8; vid = out / "clip.mp4"
+    potholes = dedup(load_dets(out), fps)
+    privacy = defaultdict(list)
+    for d in load_dets(out, "privacy_"): privacy[d.frame].append(d.box)
+    render_overlay(out, vid, potholes, privacy, fps)
+    for ph in potholes:
+        f = frame_at(vid, ph["best_frame"])
+        f = privacy_blur(f, privacy.get(ph["best_frame"]))
+        x1, y1, x2, y2 = map(int, ph["box"]); col = SEV_BGR[ph["severity"]]
+        cv2.rectangle(f, (x1, y1), (x2, y2), col, 3)
+        cv2.putText(f, f"#{ph['id']} {ph['severity']}", (x1, max(20, y1-8)), cv2.FONT_HERSHEY_SIMPLEX, 0.8, col, 2)
+        cv2.imwrite(str(out / f"pothole_{ph['id']}.jpg"), f); ph["image"] = f"/media/{rid}/pothole_{ph['id']}.jpg"
+    for ph in potholes: ph["repair"] = repair_estimate(ph)
+    r["potholes"] = potholes; r["overlay"] = f"/media/{rid}/overlay.mp4"; r["overlay_gif"] = f"/media/{rid}/overlay.gif"
+    (out / "result.json").write_text(json.dumps(r, indent=2, default=str))
+    return r
