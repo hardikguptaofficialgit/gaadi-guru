@@ -1,6 +1,6 @@
 """Gaadi Guru pipeline: video -> Spark plan -> SAM 3.1 tracking -> dedup -> severity -> privacy blur -> report."""
 from __future__ import annotations
-import json, math, subprocess, tempfile, uuid
+import json, math, re, subprocess, tempfile, uuid
 from collections import defaultdict
 from pathlib import Path
 import cv2, numpy as np
@@ -24,7 +24,62 @@ PLAN_SYS = ("You are a road-safety inspector for Indian roads. Look at the frame
             + json.dumps(list(HAZARDS)) + '. Always include "pothole" first.')
 REPORT_SYS = ("Write a formal civic complaint to the municipal corporation about road damage. Reply JSON only: "
               '{"subject":str,"body_en":str,"body_hi":str,"priority":"LOW|MEDIUM|HIGH|CRITICAL"}. '
-              "Be factual, cite the numbers given, no exaggeration, no medical advice.")
+              "Be factual, cite the counts, sizes (m2) and repair estimate given, no exaggeration, no medical advice. "
+              "Plain language for a municipal officer: NEVER mention scores, confidence, area ratios, frame numbers or model names.")
+
+_TECH = re.compile(r"(score|confidence|area[_ ]ratio|frames?[_ ]seen|best[_ ]frame|first[_ ]seen|sam[_ ]track)", re.I)
+
+
+def clean_complaint(text: str | None) -> str:
+    """Strip any technical scoring detail (scores, confidence, area ratios...) from complaint text."""
+    if not text:
+        return ""
+    out = []
+    for line in text.split("\n"):
+        if re.match(r"\s*(Details|विवरण)\s*:?\s*$", line):
+            continue
+        if _TECH.search(line):
+            keep = [s for s in re.split(r"(?<=[.;।])\s+", line) if not _TECH.search(s)]
+            line = " ".join(keep)
+            if not line.strip():
+                continue
+        out.append(line)
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
+
+
+def citizen_facts(potholes: list[dict], lat, lng, plan_: dict, voice_text: str | None) -> dict:
+    """Facts handed to Spark for the complaint: plain, officer-friendly, no internal metrics."""
+    return {"hazards": [{"id": x["id"], "type": x.get("hazard", "Pothole"), "severity": x["severity"],
+                         "approx_area_m2": (x.get("repair") or {}).get("area_m2_est"),
+                         "repair_estimate_inr": (x.get("repair") or {}).get("inr_est"),
+                         "seen_at_seconds_into_video": x.get("first_seen_s")} for x in potholes],
+            "total_repair_estimate_inr": sum((x.get("repair") or {}).get("inr_est", 0) for x in potholes),
+            "location": {"lat": lat, "lng": lng}, "road": {k: plan_.get(k) for k in ("road_type", "surface", "notes")},
+            "citizen_voice_note": voice_text}
+
+
+def draft_report(potholes, lat, lng, plan_, voice_text) -> dict:
+    try:
+        rep = meta.spark_json(REPORT_SYS, json.dumps(citizen_facts(potholes, lat, lng, plan_, voice_text), ensure_ascii=False))
+    except Exception as e:
+        return {"error": str(e)[:300]}
+    for k in ("body_en", "body_hi"):
+        rep[k] = clean_complaint(rep.get(k))
+    return rep
+
+
+def hazard_scan(frame: np.ndarray, progress=None) -> dict:
+    """Multi-hazard search: one SAM 3.1 *image* call per non-pothole concept on a mid-ride frame
+    ($0.0025 each). Concepts SAM actually finds are promoted to full video tracking."""
+    url = jpg_url(frame, 960); found = {}
+    for i, phrase in enumerate([h for h in HAZARDS if h != "pothole"]):
+        if progress: progress("scan", f"Searching for: {phrase}", i, len(HAZARDS) - 1)
+        try:
+            d, _ = meta.sam_segment(phrase, image_url=url)
+            found[phrase] = len([x for x in d if (x.confidence or 0) >= 0.5])
+        except Exception as e:
+            found[phrase] = f"error: {str(e)[:120]}"
+    return found
 
 
 def to_h264(src: Path, dst: Path, max_seconds: int = 20, fps: int = 8, width: int = 960) -> Path:
@@ -209,17 +264,28 @@ def cached(vhash: str) -> dict | None:
 
 
 def run(upload: Path, lat: float | None = None, lng: float | None = None, voice_note: bytes | None = None,
-        blur_with_sam: bool = True, ward: str | None = None, force: bool = False) -> dict:
+        blur_with_sam: bool = True, ward: str | None = None, force: bool = False, progress=None) -> dict:
+    prog = progress or (lambda *a: None)
+    prog("hash", "Checking if we have seen this ride before")
     vhash = video_hash(upload)
     if not force and (hit := cached(vhash)):
-        hit["cache_hit"] = True; return hit  # never pay SAM twice for the same video
+        hit["cache_hit"] = True; prog("cached", "Same video analysed before, reusing it (no new cost)"); return hit
     rid = uuid.uuid4().hex[:10]; out = DATA / rid; out.mkdir(parents=True)
     fps = 8
+    prog("prepare", "Preparing your video")
     vid = to_h264(upload, out / "clip.mp4", fps=fps)
-    p = plan(sample_frames(vid))
+    frames = sample_frames(vid)
+    prog("plan", "Muse Spark is looking at the road")
+    p = plan(frames)
+    p["hazard_scan"] = hazard_scan(frames[len(frames) // 2], prog) if frames else {}
+    hits = sorted([k for k, v in p["hazard_scan"].items() if isinstance(v, int) and v > 0], key=lambda k: -p["hazard_scan"][k])
+    p["spark_prompts"] = list(p["prompts"])
+    p["prompts"] = list(dict.fromkeys(["pothole"] + hits + p["prompts"][1:]))[:MAX_PHRASES]
+    prog("upload", "Uploading the video to SAM 3.1")
     fid = meta.upload_file(vid)
     dets, sam_runs = [], []
-    for phrase in p["prompts"]:
+    for k, phrase in enumerate(p["prompts"]):
+        prog("sam", f"SAM 3.1 tracking: {phrase}", k, len(p["prompts"]))
         try:
             d, raw = meta.sam_segment(phrase, file_id=fid)
             (out / f"sam_{phrase.replace(' ', '_')}.txt").write_text(raw)
@@ -229,6 +295,7 @@ def run(upload: Path, lat: float | None = None, lng: float | None = None, voice_
             sam_runs.append({"prompt": phrase, "error": str(e)[:300]})
     potholes = dedup(dets, fps)
     privacy = defaultdict(list)
+    prog("privacy", "Blurring faces and number plates")
     if blur_with_sam:
         for phrase in ("license plate", "human face"):
             try:
@@ -237,6 +304,8 @@ def run(upload: Path, lat: float | None = None, lng: float | None = None, voice_
                 for x in pd: privacy[x.frame].append(x.box)
             except Exception:
                 pass
+    (out / "privacy.json").write_text(json.dumps({str(k): v for k, v in privacy.items()}))
+    prog("render", "Drawing the pothole outlines")
     render_overlay(out, vid, potholes, privacy, fps)
     for ph in potholes:
         f = frame_at(vid, ph["best_frame"])
@@ -249,6 +318,7 @@ def run(upload: Path, lat: float | None = None, lng: float | None = None, voice_
         cv2.imwrite(str(out / f"pothole_{ph['id']}.jpg"), f); ph["image"] = f"/media/{rid}/pothole_{ph['id']}.jpg"
     voice = None
     if voice_note:
+        prog("voice", "Transcribing your voice note")
         try:
             wav = out / "note.wav"; src = out / "note.in"; src.write_bytes(voice_note)
             subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(src), "-ac", "1", "-ar", "16000",
@@ -256,18 +326,34 @@ def run(upload: Path, lat: float | None = None, lng: float | None = None, voice_
             voice = meta.transcribe(wav.read_bytes(), ["Hindi", "English"], ["gaddha", "pothole", "sadak"])
         except Exception as e:
             voice = {"error": str(e)[:300]}
-    facts = {"potholes": [{k: v for k, v in x.items() if k not in ("box", "image", "track_boxes", "sam_tracks")} for x in potholes],
-             "location": {"lat": lat, "lng": lng}, "road": p, "citizen_voice_note": (voice or {}).get("transcript")}
-    try:
-        report = meta.spark_json(REPORT_SYS, json.dumps(facts))
-    except Exception as e:
-        report = {"error": str(e)[:300]}
     for ph in potholes: ph["repair"] = repair_estimate(ph)
+    prog("cost", "Working out the repair cost")
+    prog("write", "Muse Spark is writing the complaint in Hindi and English")
+    report = draft_report(potholes, lat, lng, p, (voice or {}).get("transcript"))
     result = {"id": rid, "video_hash": vhash, "ward": ward, "status": "reported", "lat": lat, "lng": lng, "plan": p, "sam_runs": sam_runs, "potholes": potholes,
               "voice": voice, "report": report, "video": f"/media/{rid}/clip.mp4",
               "overlay": f"/media/{rid}/overlay.mp4", "overlay_gif": f"/media/{rid}/overlay.gif"}
     (out / "result.json").write_text(json.dumps(result, indent=2, default=str))
+    prog("done", "Done")
     return result
+
+
+def redraft(rid: str) -> dict:
+    """Re-write an existing report's complaint from plain facts (one Spark call, no SAM)."""
+    out = DATA / rid; r = json.loads((out / "result.json").read_text())
+    for ph in r["potholes"]: ph["repair"] = ph.get("repair") or repair_estimate(ph)
+    r["report"] = draft_report(r["potholes"], r.get("lat"), r.get("lng"), r.get("plan", {}), (r.get("voice") or {}).get("transcript"))
+    (out / "result.json").write_text(json.dumps(r, indent=2, ensure_ascii=False, default=str))
+    return r["report"]
+
+
+def privacy_boxes(rid: str) -> dict:
+    out = DATA / rid; f = out / "privacy.json"
+    if f.exists():
+        return {int(k): v for k, v in json.loads(f.read_text()).items()}
+    pv = defaultdict(list)
+    for d in load_dets(out, "privacy_"): pv[d.frame].append(d.box)
+    return pv
 
 
 SEV_BGR = {"LOW": (0, 200, 0), "MEDIUM": (0, 210, 255), "HIGH": (0, 130, 255), "CRITICAL": (40, 40, 230)}

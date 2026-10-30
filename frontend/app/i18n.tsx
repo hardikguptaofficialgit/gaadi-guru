@@ -29,9 +29,6 @@ export function LangProvider({ children }: { children: React.ReactNode }) {
 }
 export const useT = () => useContext(C);
 export const HOWBAD: Record<string, [string, string]> = { CRITICAL: ["Dangerous", "खतरनाक"], HIGH: ["Bad", "खराब"], MEDIUM: ["Okay-ish", "ठीक-ठाक"], LOW: ["Minor", "हल्का"] };
-export const WARDS: [string, number, number][] = [["Ward 12 - Saheed Nagar", 20.2961, 85.8245], ["Ward 23 - Patia", 20.3530, 85.8190], ["Ward 31 - Old Town", 20.2380, 85.8340],
-  ["Ward 45 - Chandrasekharpur", 20.3240, 85.8180], ["Ward 7 - Nayapalli", 20.2900, 85.8000]];
-export const nearestWard = (la: number, ln: number) => WARDS.reduce((b, w) => (Math.hypot(w[1] - la, w[2] - ln) < Math.hypot(b[1] - la, b[2] - ln) ? w : b))[0];
 export const mine = { get: (): string[] => { try { return JSON.parse(localStorage.getItem("mine") || "[]"); } catch { return []; } },
   add: (id: string) => { const m = mine.get().filter(x => x !== id); localStorage.setItem("mine", JSON.stringify([id, ...m])); } };
 export function Stepper({ at }: { at: 1 | 2 | 3 }) {

@@ -86,7 +86,7 @@ def estimate_repair_cost(report_id: str, **_):
 
 def draft_complaint(report_id: str, **_):
     rep = _load(report_id).get("report", {})
-    return {"subject": rep.get("subject"), "body_en": (rep.get("body_en") or "")[:1200], "body_hi": (rep.get("body_hi") or "")[:800]}
+    return {"subject": rep.get("subject"), "body_en": pipeline.clean_complaint(rep.get("body_en"))[:1200], "body_hi": pipeline.clean_complaint(rep.get("body_hi"))[:800]}
 
 
 def file_complaint(report_id: str, _emit=None, **_):
@@ -95,8 +95,10 @@ def file_complaint(report_id: str, _emit=None, **_):
         res = json.loads(f.read_text()); res["cached"] = True
     else:
         from . import main  # reuse endpoint logic
-        res = main.file_complaint(report_id, main.FileReq(ward=r.get("ward") or "Ward 7"))
+        c = r.get("contact") or {}
+        res = main.file_complaint(report_id, main.FileReq(name=c.get("name", ""), mobile=c.get("mobile", ""), ward=r.get("ward") or ""))
     r["status"] = "filed"; r["filed_at"] = dt.datetime.now().isoformat(timespec="seconds"); _save(r)
+    if res.get("error"): return {"error": res["error"]}
     return {"stop_reason": res.get("stop_reason"), "submitted": res.get("submitted"), "screenshot": f"/media/{report_id}/wonder_final.png",
             "fields_filled": sum(bool(v) for v in (res.get("filled") or {}).values()), "cached": res.get("cached", False),
             "note": "Form pre-filled; final Submit left for the citizen."}
@@ -118,6 +120,10 @@ def verify_repair(report_id: str, reride_report_id: str, **_):
     if gap > 150:
         return {"verdict": "NOT COMPARABLE", "distance_m": round(gap, 1), "note": "Re-ride is not on the same stretch (>150 m); ask the citizen to re-ride the original road."}
     fixed = len(b["potholes"]) < len(a["potholes"]) * 0.5 and sev(b) < sev(a) * 0.5
+    seen = "pothole" in (b.get("plan", {}).get("spark_prompts") or b.get("plan", {}).get("prompts") or [])
+    if fixed and seen:  # Spark still sees potholes but SAM masked none: do not claim a fix
+        return {"verdict": "INCONCLUSIVE", "distance_m": round(gap, 1), "before": {"count": len(a["potholes"])},
+                "after": {"count": len(b["potholes"])}, "note": "Muse Spark still sees a pothole on the re-ride but SAM could not mask it; please re-ride with a clearer video."}
     res = {"before": {"count": len(a["potholes"]), "severity_points": sev(a)},
            "after": {"count": len(b["potholes"]), "severity_points": sev(b)},
            "distance_m": round(_hav((a.get("lat"), a.get("lng")), (b.get("lat"), b.get("lng"))), 1),

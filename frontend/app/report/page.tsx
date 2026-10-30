@@ -10,7 +10,7 @@ const HUMAN: Record<string, [string, string]> = { analyze_video: ["Looking at yo
   file_complaint: ["Filling the city portal form for you", "आपके लिए पोर्टल फॉर्म भर रहे हैं"], schedule_followup: ["Setting a 7-day reminder", "7 दिन का रिमाइंडर लगा रहे हैं"], verify_repair: ["Checking if it got fixed", "देख रहे हैं कि ठीक हुआ या नहीं"] };
 function R() {
   const id = useSearchParams().get("id"); const { t, lang } = useT(); const L = lang === "hi" ? 1 : 0;
-  const [r, setR] = useState<any>(null); const [steps, setSteps] = useState<any[]>([]); const [all, setAll] = useState<any[]>([]); const [missing, setMissing] = useState(false);
+  const [r, setR] = useState<any>(null); const [steps, setSteps] = useState<any[]>([]); const [all, setAll] = useState<any[]>([]); const [missing, setMissing] = useState(false); const [name, setName] = useState(""); const [mob, setMob] = useState("");
   const load = () => id && get(`/reports/${id}`).then(x => x.id ? setR(x) : setMissing(true)).catch(() => setMissing(true));
   useEffect(() => { load(); get("/reports").then(setAll).catch(() => {}); }, [id]);
   const running = steps.length > 0 && !steps.some(s => s.kind === "done" || s.kind === "error");
@@ -21,7 +21,8 @@ function R() {
   const total = r.potholes.reduce((a: number, p: any) => a + (p.repair?.inr_est || 0), 0);
   const counts = ["CRITICAL", "HIGH", "MEDIUM", "LOW"].map(s => [s, r.potholes.filter((p: any) => p.severity === s).length] as [string, number]).filter(x => x[1]);
   const sent = ["filed", "promised", "fixed"].includes(r.status) || !!r.followup_due;
-  const send = () => fetch(`${API}/reports/${r.id}/agent`, { method: "POST" }).then(() => setSteps([{ kind: "start" }]));
+  const send = async () => { if (name || mob) await fetch(`${API}/reports/${r.id}/contact`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, mobile: mob }) });
+    await fetch(`${API}/reports/${r.id}/agent`, { method: "POST" }); setSteps([{ kind: "start" }]); };
   const lastCall = [...steps].reverse().find(s => s.kind === "tool_call");
   const shareText = lang === "hi" ? `मैंने ${r.ward || "मेरे इलाके"} में ${r.potholes.length} गड्ढे रिपोर्ट किए। समर्थन करें:` : `I reported ${r.potholes.length} potholes in ${r.ward || "my area"}. Back it up:`;
   return <main className="wrap stack" style={{ gap: 22, paddingTop: 12 }}>
@@ -35,25 +36,29 @@ function R() {
         <div className="well stat"><b>{inr(total)}</b><span>{t("fix")}</span></div>
         {r.voice?.transcript && <div className="well"><span className="tiny">🎙 {lang === "hi" ? "आपने कहा" : "You said"}</span><p>{r.voice.transcript}</p></div>}
         {r.upvotes > 0 && <span className="tiny">👍 {r.upvotes} {lang === "hi" ? "लोगों ने समर्थन किया" : "neighbours backed this"}</span>}
-        {!sent && !running && <button className="btn primary xl" onClick={send}>{t("send")} →</button>}
+        {!sent && !running && <><div className="g2" style={{ gap: 10 }}><label className="field">{lang === "hi" ? "आपका नाम (वैकल्पिक)" : "Your name (optional)"}<input value={name} onChange={e => setName(e.target.value)} autoComplete="name" /></label>
+          <label className="field">{lang === "hi" ? "मोबाइल (वैकल्पिक)" : "Mobile (optional)"}<input value={mob} onChange={e => setMob(e.target.value.replace(/[^0-9+ ]/g, ""))} inputMode="tel" autoComplete="tel" /></label></div>
+          <span className="tiny">{lang === "hi" ? "खाली छोड़ें तो पोर्टल पर ये फ़ील्ड आप खुद भरेंगे।" : "Leave blank and you fill these on the portal yourself."}</span>
+          <button className="btn primary xl" onClick={send}>{t("send")} →</button></>}
         {running && <div className="glass stack" style={{ padding: 16, gap: 6 }} role="status" aria-live="polite"><div className="row"><div className="spinner sm" /><b>{lastCall ? HUMAN[lastCall.tool]?.[L] || "…" : t("sending")}</b></div>
-          <span className="tiny">{steps.filter(s => s.kind === "tool_result").length} / 6</span></div>}
+          <span className="tiny">{steps.filter(s => s.kind === "tool_result").length} {lang === "hi" ? "कदम पूरे" : "steps done"}</span></div>}
       </div>
     </section>
     {sent && !running && <section className="card stack success" style={{ gap: 14 }}>
       <div className="row"><span className="ok-dot" aria-hidden>✓</span><h2>{t("sent")}</h2></div>
       <p className="mut">{t("remind")} {r.followup_due && <b>({r.followup_due})</b>}</p>
-      {r.wonder?.screenshot || r.filed_screenshot ? null : null}
+      {r.wonder?.screenshot && <figure className="stack" style={{ gap: 6 }}><img className="media" src={API + r.wonder.screenshot} alt={lang === "hi" ? "भरा हुआ पोर्टल फॉर्म" : "Filled portal form"} /><figcaption className="tiny">{lang === "hi" ? "Muse Wonder ने भरा फॉर्म (डेमो पोर्टल) — सबमिट आप करेंगे" : "Form filled by Muse Wonder (demo portal) — you press Submit"}</figcaption></figure>}
+      {r.verification && <div className="well"><b>{r.verification.verdict}</b> <span className="tiny">{r.verification.before?.count} → {r.verification.after?.count}</span></div>}
       <div><span className="tiny">{t("share")}</span><Share id={r.id} text={shareText} /></div></section>}
     {r.report?.subject && <section className="card stack" style={{ gap: 12 }}><span className="eyebrow">{lang === "hi" ? "आपकी शिकायत" : "Your complaint"}</span><h3>{r.report.subject}</h3>
-      <div className="well"><pre>{(lang === "hi" ? r.report.body_hi : r.report.body_en || "").split("\n").filter((l: string) => !/^(Details|विवरण)\s*:/.test(l.trim())).join("\n")}</pre></div>
+      <div className="well"><pre>{(lang === "hi" ? r.report.body_hi : r.report.body_en || "")}</pre></div>
       <div className="row"><button className="btn" onClick={() => navigator.clipboard?.writeText(`${r.report.subject}\n\n${lang === "hi" ? r.report.body_hi : r.report.body_en}`)}>{lang === "hi" ? "शिकायत कॉपी करें" : "Copy complaint"}</button>{!sent && <Share id={r.id} text={shareText} />}</div></section>}
     <details className="card"><summary><b>{t("details")}</b></summary>
       <div className="stack" style={{ gap: 18, marginTop: 16 }}>
         <div className="grid">{r.potholes.map((p: any) => <div className="card sm stack" style={{ gap: 8 }} key={p.id}>
           {p.image && <img className="media" src={API + p.image} alt="" />}
           <div className="row between"><b>#{p.id} {p.hazard || "Pothole"}</b><span className={"pill " + p.severity}>{HOWBAD[p.severity]?.[L]}</span></div>
-          <span className="tiny">{p.repair?.area_m2_est ?? "—"} m² · {inr(p.repair?.inr_est)} · score {p.score}</span></div>)}</div>
+          <span className="tiny">{p.repair?.area_m2_est ?? "—"} m² · {inr(p.repair?.inr_est)}</span></div>)}</div>
         <div className="row"><a className="btn" href={`${API}/reports/${r.id}/coco`}>COCO dataset (.zip)</a><span className="tiny">SAM 3.1 prompts: {r.plan?.prompts?.join(", ")}</span></div>
         <Timeline rid={r.id} rerides={all.filter(x => x.id !== r.id)} />
       </div></details>

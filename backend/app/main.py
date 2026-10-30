@@ -36,6 +36,54 @@ async def analyze(video: UploadFile = File(...), lat: float | None = Form(None),
         tmp.unlink(missing_ok=True)
 
 
+# ---------------- async analysis jobs: real pipeline progress for the UI ----------------
+import threading, time, uuid  # noqa: E402
+JOBS: dict[str, dict] = {}
+STAGE_ORDER = ["hash", "prepare", "plan", "scan", "upload", "sam", "privacy", "render", "voice", "cost", "write", "done"]
+
+
+@app.post("/jobs")
+async def job_start(video: UploadFile = File(...), lat: float | None = Form(None), lng: float | None = Form(None),
+                    voice_note: UploadFile | None = File(None), ward: str | None = Form(None)):
+    jid = uuid.uuid4().hex[:10]
+    tmp = pipeline.DATA / f"upload_{jid}_{Path(video.filename or 'clip').name}"
+    tmp.write_bytes(await video.read())
+    is_img = (video.content_type or "").startswith("image/") or tmp.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp", ".heic")
+    vn = await voice_note.read() if voice_note else None
+    job = JOBS[jid] = {"id": jid, "state": "running", "stage": "upload_received", "events": [], "started": time.time(), "spend_start": costs.total()}
+
+    def prog(stage, text, i=None, n=None):
+        job["stage"] = stage
+        job["events"].append({"stage": stage, "text": text, "i": i, "n": n, "t": round(time.time() - job["started"], 1)})
+
+    def work():
+        nonlocal tmp
+        try:
+            if is_img:
+                import subprocess
+                prog("prepare", "Converting your photo")
+                mp4 = tmp.with_suffix(".photo.mp4")
+                subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-loop", "1", "-i", str(tmp), "-t", "1", "-r", "5",
+                                "-vf", "scale='min(1280,iw)':-2,format=yuv420p", "-c:v", "libx264", str(mp4)], check=True)
+                tmp.unlink(missing_ok=True); tmp = mp4
+            r = pipeline.run(tmp, lat, lng, vn, ward=ward, progress=prog)
+            job.update(state="done", report_id=r["id"], cache_hit=bool(r.get("cache_hit")))
+        except Exception as e:
+            job.update(state="error", error=str(e)[:400])
+        finally:
+            tmp.unlink(missing_ok=True); job["spend_usd"] = round(costs.total() - job["spend_start"], 4)
+    threading.Thread(target=work, daemon=True).start()
+    return {"job_id": jid}
+
+
+@app.get("/jobs/{jid}")
+def job_status(jid: str):
+    if jid not in JOBS:
+        raise HTTPException(404)
+    j = JOBS[jid]
+    return {**j, "elapsed_s": round(time.time() - j["started"], 1), "spend_usd": j.get("spend_usd", round(costs.total() - j["spend_start"], 4))}
+
+
 @app.get("/reports")
 def reports():
     out = []
@@ -51,7 +99,10 @@ def report(rid: str):
     f = pipeline.DATA / rid / "result.json"
     if not f.exists() or "/" in rid:
         raise HTTPException(404)
-    return json.loads(f.read_text())
+    r = json.loads(f.read_text()); w = f.parent / "wonder.json"
+    if w.exists() and (f.parent / "wonder_final.png").exists():
+        wj = json.loads(w.read_text()); r["wonder"] = {"screenshot": f"/media/{rid}/wonder_final.png", "submitted": wj.get("submitted"), "filled": wj.get("filled")}
+    return r
 
 
 STATIC = Path(__file__).parent / "static"
@@ -85,9 +136,9 @@ def coco_all():
 
 
 class FileReq(BaseModel):
-    name: str = "Citizen"
-    mobile: str = "9XXXXXXXXX"
-    ward: str = "Ward 7"
+    name: str = ""      # citizen fills on the portal if not given; never invented
+    mobile: str = ""
+    ward: str = ""
     portal_url: str | None = None
 
 
@@ -97,9 +148,9 @@ def file_complaint(rid: str, req: FileReq):
     from . import wonder_agent
     r = _load(rid); rep = r.get("report", {})
     worst = max((p["severity"] for p in r["potholes"]), key=["LOW", "MEDIUM", "HIGH", "CRITICAL"].index, default="LOW")
-    data = {"Citizen name": req.name, "Mobile number": req.mobile, "Ward / Zone": req.ward, "Category": "Roads & Potholes",
+    data = {"Citizen name": req.name, "Mobile number": req.mobile, "Ward / Zone": req.ward or r.get("ward") or "", "Category": "Roads & Potholes",
             "Location": f"{r.get('lat')}, {r.get('lng')}", "Subject": rep.get("subject", "Potholes"),
-            "Description": (rep.get("body_en") or "")[:900], "Severity": worst}
+            "Description": pipeline.clean_complaint(rep.get("body_en"))[:900], "Severity": worst}
     res = wonder_agent.fill_complaint(req.portal_url or "http://127.0.0.1:8000/mock-portal", data, pipeline.DATA / rid)
     res["screenshot"] = f"/media/{rid}/wonder_final.png"
     (pipeline.DATA / rid / "wonder.json").write_text(json.dumps(res, indent=2, default=str))
@@ -196,3 +247,82 @@ def followups():
     f = pipeline.DATA / "followups.json"
     d = json.loads(f.read_text()) if f.exists() else {}
     return sorted([{"id": k, **v} for k, v in d.items()], key=lambda x: x["due"])
+
+
+class Contact(BaseModel):
+    name: str = ""
+    mobile: str = ""
+
+
+@app.post("/reports/{rid}/contact")
+def set_contact(rid: str, c: Contact):
+    r = _load(rid); r["contact"] = {"name": c.name.strip()[:80], "mobile": "".join(ch for ch in c.mobile if ch.isdigit())[:12]}
+    (pipeline.DATA / rid / "result.json").write_text(json.dumps(r, ensure_ascii=False, indent=2, default=str))
+    return {"ok": True}
+
+
+@app.get("/reports/{rid}/frame")
+def frame(rid: str, kind: str = "raw", i: int | None = None):
+    """One frame as JPEG: raw ride frame (privacy-blurred) or the SAM overlay frame, for the before/after slider."""
+    import cv2
+    r = _load(rid); i = r["potholes"][0]["best_frame"] if i is None and r["potholes"] else (i or 0)
+    src = pipeline.DATA / rid / ("overlay.mp4" if kind == "overlay" else "clip.mp4")
+    f = pipeline.frame_at(src, i)
+    if f is None:
+        raise HTTPException(404)
+    if kind != "overlay":
+        f = pipeline.privacy_blur(f, pipeline.privacy_boxes(rid).get(i))
+    ok, b = cv2.imencode(".jpg", f, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    return Response(b.tobytes(), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=3600"})
+
+
+_GEO: dict = {}
+
+
+@app.get("/geo/reverse")
+def geo_reverse(lat: float, lng: float):
+    """Real locality name from OpenStreetMap Nominatim (cached, 1 req per point)."""
+    import httpx
+    k = (round(lat, 4), round(lng, 4))
+    if k not in _GEO:
+        try:
+            j = httpx.get("https://nominatim.openstreetmap.org/reverse", params={"lat": lat, "lon": lng, "format": "jsonv2", "zoom": 16},
+                          headers={"User-Agent": "gaadi-guru-hackathon/1.0"}, timeout=8).json()
+            a = j.get("address", {})
+            _GEO[k] = {"locality": a.get("suburb") or a.get("neighbourhood") or a.get("quarter") or a.get("city_district") or a.get("road"),
+                       "city": a.get("city") or a.get("town") or a.get("state_district"), "display": j.get("display_name"), "source": "OpenStreetMap Nominatim"}
+        except Exception as e:
+            return {"error": str(e)[:200]}
+    return _GEO[k]
+
+
+@app.get("/wards")
+def wards():
+    """Ward names citizens have actually used, for autocomplete."""
+    return sorted({r.get("ward") for r in agent.all_reports() if r.get("ward")})
+
+
+@app.get("/stats")
+def stats():
+    """Everything the landing page shows, computed from real reports + the spend log."""
+    rs = agent.all_reports(); rp = repairs()
+    feat = max(rs, key=lambda r: (len(r["potholes"]), (pipeline.DATA / r["id"] / "agent.jsonl").exists()), default=None)
+    f = None
+    if feat:
+        ph = feat["potholes"]
+        tot = sum((p.get("repair") or pipeline.repair_estimate(p))["inr_est"] for p in ph)
+        steps_ = agent.steps(feat["id"])
+        f = {"id": feat["id"], "ward": feat.get("ward"), "count": len(ph), "dangerous": sum(p["severity"] == "CRITICAL" for p in ph),
+             "inr": tot, "top_m2": max(((p.get("repair") or {}).get("area_m2_est", 0) for p in ph), default=0),
+             "overlay": feat.get("overlay"), "best_frame": ph[0]["best_frame"] if ph else 0,
+             "hazard_types": sorted({p.get("hazard", "Pothole") for p in ph}), "followup_due": feat.get("followup_due"),
+             "portal": f"/media/{feat['id']}/wonder_final.png" if (pipeline.DATA / feat["id"] / "wonder_final.png").exists() else None,
+             "agent": [{"tool": s["tool"], "result": s.get("result")} for s in steps_ if s.get("kind") == "tool_result"]}
+    return {"reports": len(rs), "hazards": sum(len(r["potholes"]) for r in rs),
+            "dangerous": sum(p["severity"] == "CRITICAL" for r in rs for p in r["potholes"]),
+            "inr_total": sum(x["repair_total_inr"] for x in rp), "wards": len({x["ward"] for x in rp}),
+            "filed": sum(x["status"] in ("filed", "promised", "fixed") for x in rp), "fixed": sum(x["status"] == "fixed" for x in rp),
+            "upvotes": sum(x["upvotes"] for x in rp), "spend_usd": costs.total(),
+            "rates": {"pothole_inr_per_m2": pipeline.RATE_PER_M2["Pothole"], "min_inr": 1500, "visible_road_m2": pipeline.VISIBLE_ROAD_M2,
+                      "label": "Assumption: typical urban patching rate; not a municipal quote"},
+            "featured": f}

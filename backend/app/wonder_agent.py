@@ -10,7 +10,7 @@ from pathlib import Path
 from . import meta
 
 W, H = 1280, 900
-TASK = """You are filling a municipal public-grievance web form for a citizen. Fill EVERY field using this data:
+TASK = """You are filling a municipal public-grievance web form for a citizen. Fill every field that has a value in this data (leave a field empty if its value is ""):
 {data}
 For dropdowns pick the closest option (Category = "Roads & Potholes"). Click a field before typing in it.
 When all fields are filled, DO NOT click Submit. Stop and say "READY FOR REVIEW"."""
