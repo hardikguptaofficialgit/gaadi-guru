@@ -1,0 +1,17 @@
+.env
+.env.*
+.secrets/
+**/.secrets/
+*.key
+__pycache__/
+.venv/
+node_modules/
+.next/
+backend/data/
+samples/*.mp4
+samples/*.jpg
+samples/*.png
+samples/*.wav
+.meta_key
+frontend/tsconfig.tsbuildinfo
+samples/*.ogg
