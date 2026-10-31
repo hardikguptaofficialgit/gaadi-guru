@@ -13,8 +13,14 @@ export default function Login() {
   const [sent, setSent] = useState(false); const [err, setErr] = useState("");
   const local = typeof window !== "undefined" ? mine.get().length : 0;
   async function go(e: React.FormEvent) { e.preventDefault(); setBusy(true); setErr(""); const x = await a.sendLink(email.trim()); setBusy(false); x ? setErr(x) : setSent(true); }
-  const head = (t: string, s: string) => <div className="auth-head"><img src="/brand/logo.svg" alt="Patchwise" width={48} height={48} /><h1>{t}</h1><p className="mut small">{s}</p></div>;
-  return <main className="auth-page bg-topo"><motion.div className="auth-card" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .3 }}>
+  const head = (t: string, s: string) => <div className="auth-head"><img src="/brand/logo.svg" alt="Patchwise" width={32} height={32} /><h1>{t}</h1><p className="mut small">{s}</p></div>;
+  return <main className="auth-page lg-split"><aside className="lg-aside">
+    <span className="eyebrow mono-t">{T("Account · optional", "अकाउंट · वैकल्पिक")}</span>
+    <h2 className="lg-h">{T("Your reports, ", "आपकी रिपोर्ट, ")}<em className="acc">{T("on every phone.", "हर फ़ोन पर।")}</em></h2>
+    <ol className="lg-pts"><li><b>01</b>{T("Reports you filed on this phone follow you to the laptop.", "इस फ़ोन की रिपोर्ट लैपटॉप पर भी।")}</li>
+      <li><b>02</b>{T("See when a ward promised a fix and whether the re-ride agreed.", "वार्ड ने कब वादा किया और री-राइड ने क्या पाया।")}</li>
+      <li><b>03</b>{T("We store your email only. No password, no phone number.", "सिर्फ ईमेल। पासवर्ड या फ़ोन नंबर नहीं।")}</li></ol></aside>
+    <motion.div className="auth-card" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .3 }}>
     <AnimatePresence mode="wait" initial={false}>
       {a.user ? <motion.div key="in" {...swap} className="stack gap-4" data-testid="signed-in">
         {head(T("You're signed in", "आप साइन इन हैं"), a.user.email || "")}

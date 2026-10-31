@@ -29,7 +29,7 @@ function Lines({ lines, as: Tag = "h2", className = "", delay = 0, now = false }
   const M = (motion as any)[Tag];
   return <M className={className} initial="hidden" {...(now ? { animate: "show" } : { whileInView: "show", viewport: { once: true, amount: 0.6 } })}
     variants={{ hidden: {}, show: { transition: { staggerChildren: 0.11, delayChildren: delay } } }}>
-    {lines.map((l, i) => <span key={i + l} className="ln"><motion.span className="ln-i" variants={{ hidden: { y: "105%" }, show: { y: "0%", transition: { duration: 0.85, ease } } }}>{l}</motion.span></span>)}
+    {lines.map((l, i) => <span key={i + l} className="ln"><motion.span className="ln-i" variants={{ hidden: { y: "105%" }, show: { y: "0%", transition: { duration: 0.85, ease } } }}>{l.split(/(\*[^*]+\*)/).map((x, j) => x.startsWith("*") ? <em key={j} className="acc">{x.slice(1, -1)}</em> : x)}</motion.span></span>)}
   </M>;
 }
 
@@ -61,16 +61,6 @@ function detail(tool: string, r: any, L: (a: string, b: string) => string) {
 
 function Idx({ i, t }: { i: string; t: string }) { return <div className="l-idx"><span className="num">{i}</span><span>{t}</span></div>; }
 
-/** Three-column value strip under the hero, ruled by hairlines. */
-function Strip() {
-  const L = useL();
-  const V: [string, string, string, string][] = [["scan", "01", L("Detect", "पहचान"), L("SAM 3.1 outlines every pothole in your ride and rates how bad it is.", "SAM 3.1 राइड में हर गड्ढे का निशान और गंभीरता बताता है।")],
-    ["gov", "02", L("Route", "सही विभाग"), L("Finds the body that owns the road, with the source for every contact.", "सड़क किस विभाग की है, हर संपर्क के स्रोत के साथ।")],
-    ["mail", "03", L("Send", "भेजें"), L("A ready email in English and Hindi, or the portal form field by field.", "अंग्रेज़ी-हिंदी में तैयार ईमेल, या पोर्टल फ़ॉर्म फ़ील्ड-दर-फ़ील्ड।")]];
-  return <motion.ol className="l-strip" variants={stagger} {...inView}>{V.map(([ic, i, t, d]) => <motion.li key={i} variants={up}>
-    <div className="row between"><Icon n={ic} s={20} /><span className="tiny num">{i}</span></div><h3>{t}</h3><p className="mut small">{d}</p></motion.li>)}</motion.ol>;
-}
-
 /** Send to the right authority: real coverage from /authorities. */
 function Send() {
   const L = useL(); const [d, setD] = useState<any>(null);
@@ -96,31 +86,46 @@ function Send() {
   </section>;
 }
 
-/* Hallmark redesign: one idea per screen, no eyebrows, no feature grid, page ends on its one action. */
+/** r6 hero: asymmetric. Headline + one action on the left; the real product (a live report ticket) on the right. */
+function Ticket() {
+  const f = useContext(S)?.featured; const L = useL(); const [r, setR] = useState<any>(null); const [rt, setRt] = useState<any>(null);
+  useEffect(() => { if (!f?.id) return; get(`/reports/${f.id}`).then(setR).catch(() => {}); get(`/reports/${f.id}/route`).then(setRt).catch(() => {}); }, [f?.id]);
+  const auth = rt?.authorities?.[0]; const lines = (r?.report?.body_en || "").split("\n").filter(Boolean);
+  return <motion.article className="tk" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease, delay: 0.2 }} aria-label={L("A real Patchwise report", "एक असली Patchwise रिपोर्ट")}>
+    <header className="tk-h"><span className="mono-t">PW-{f?.id || "··········"}</span><span className="tk-st"><i />{r ? ({ reported: L("Reported", "रिपोर्ट"), filed: L("Filed", "दर्ज"), promised: L("Awaiting repair", "मरम्मत बाकी"), fixed: L("Fixed", "ठीक") } as any)[r.status] || r.status : "…"}</span></header>
+    <div className="tk-media">{f?.overlay ? <video src={API + f.overlay} autoPlay muted loop playsInline aria-label={L("Pothole masks drawn by SAM 3.1 on a real ride", "असली राइड पर SAM 3.1 के गड्ढा निशान")} /> : <div className="hm-empty" />}
+      <span className="tk-tag mono-t">SAM 3.1 · {L("frame", "फ्रेम")} {f?.best_frame ?? "—"}</span></div>
+    <dl className="tk-meta">
+      <div><dt>{L("Where", "जगह")}</dt><dd>{f?.ward || "—"}{r && <span className="mono-t mut"> {r.lat?.toFixed(3)}, {r.lng?.toFixed(3)}</span>}</dd></div>
+      <div><dt>{L("Found", "मिले")}</dt><dd><b className="mono-t">{f?.count ?? "—"}</b> {L("potholes", "गड्ढे")}, {f?.dangerous ?? 0} {L("dangerous", "खतरनाक")}; {L("largest", "सबसे बड़ा")} <span className="mono-t">{f?.top_m2 ?? "—"} m²</span></dd></div>
+      <div><dt>{L("Fix, est.", "खर्च, अनुमान")}</dt><dd className="mono-t">{f ? inr(f.inr) : "—"}</dd></div>
+      <div><dt>{L("Routed to", "भेजा गया")}</dt><dd>{auth?.authority || "—"}</dd></div>
+      <div><dt>{L("Re-check", "फिर जांच")}</dt><dd className="mono-t">{f?.followup_due || "—"}</dd></div>
+    </dl>
+    {r?.report?.subject && <div className="tk-letter"><b>{r.report.subject}</b><p>{lines.slice(1, 2).join(" ").slice(0, 210)}{lines.length > 2 ? "…" : ""}</p></div>}
+    <footer className="tk-f"><span>{L("Faces and plates blurred", "चेहरे व प्लेट धुंधले")}</span>{f && <Link href={`/report?id=${f.id}`} className="tk-open">{L("Open this report", "यह रिपोर्ट खोलें")}<Icon n="arrow" s={14} /></Link>}</footer>
+  </motion.article>;
+}
+
 function Hero() {
-  const s = useContext(S); const f = s?.featured; const L = useL();
-  return <section className="hm-hero bg-topo">
-    <div className="hm-hero-copy">
-      <Lines now as="h1" className="l-h1" delay={0.05} lines={L("Every bad road,|reported in one tap.", "हर खराब सड़क,|एक टैप में रिपोर्ट।").split("|")} />
-      <motion.p className="l-lead" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease, delay: 0.35 }}>
-        {L("Record your ride. Patchwise finds each pothole, prices the fix and routes the complaint to the authority that owns the road.",
-           "राइड रिकॉर्ड करें। Patchwise हर गड्ढा ढूंढता है, मरम्मत का खर्च निकालता है और शिकायत सही विभाग तक पहुंचाता है।")}</motion.p>
-      <motion.div className="row" style={{ gap: 20 }} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease, delay: 0.45 }}>
-        <Magnetic><Link href="/new" className="btn primary xl cta">{L("Report a road", "सड़क रिपोर्ट करें")}<Icon n="arrow" s={18} /></Link></Magnetic>
-        <a href="#record" className="l-link">{L("See a real report", "असली रिपोर्ट देखें")}</a>
+  const L = useL(); const s = useContext(S);
+  return <section className="hx">
+    <div className="hx-copy">
+      <p className="hx-kicker mono-t">{L("Bhubaneswar · Delhi · Kolkata · NYC · SF and 20 more cities", "भुवनेश्वर · दिल्ली · कोलकाता · NYC · SF और 20 शहर")}</p>
+      <Lines now as="h1" className="hx-h1" delay={0.05} lines={L("Every bad road|has an owner. *We find them.*", "हर खराब सड़क|का एक मालिक है। *हम ढूंढते हैं।*").split("|")} />
+      <motion.p className="hx-lead" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease, delay: 0.3 }}>
+        {L("Film thirty seconds of the road from your scooter. Patchwise marks every pothole, prices the patch at municipal rates, and writes the complaint to the ward office or 311 desk that is actually responsible — in English and Hindi.",
+           "स्कूटर से सड़क के तीस सेकंड रिकॉर्ड करें। Patchwise हर गड्ढा चिह्नित करता है, नगर निगम दर से खर्च निकालता है, और उसी वार्ड दफ़्तर या 311 डेस्क को शिकायत लिखता है जो ज़िम्मेदार है।")}</motion.p>
+      <motion.div className="hx-act" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease, delay: 0.4 }}>
+        <Magnetic k={0.15}><Link href="/new" className="btn primary lg cta">{L("Report a road", "सड़क रिपोर्ट करें")}<Icon n="arrow" s={16} /></Link></Magnetic>
+        <a href="#record" className="l-link">{L("How detection works", "पहचान कैसे होती है")}</a>
       </motion.div>
-      <motion.p className="l-built tiny" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.7, delay: 0.6 }}>
-        <span>{L("Built on", "आधार")}</span><span className="row gap-1"><Brand b="meta" s={12} label="Meta" /> SAM 3.1 · Muse</span>
-        <span className="row gap-1"><Brand b="openstreetmap" s={14} label="OpenStreetMap" /> OpenStreetMap</span><span className="row gap-1"><Brand b="supabase" s={14} label="Supabase" /> Supabase</span></motion.p>
+      {s && <motion.dl className="hx-nums" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.55 }}>
+        <div><dt>{L("Potholes mapped", "दर्ज गड्ढे")}</dt><dd className="mono-t">{n(s.hazards)}</dd></div>
+        <div><dt>{L("Repair backlog", "मरम्मत बकाया")}</dt><dd className="mono-t">{inr(s.inr_total)}</dd></div>
+        <div><dt>{L("Complaints filled", "शिकायतें भरी")}</dt><dd className="mono-t">{s.filed}/{s.reports}</dd></div></motion.dl>}
     </div>
-    <motion.figure className="hm-stage card" initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease, delay: 0.15 }}>
-      {f?.overlay ? <video src={API + f.overlay} autoPlay muted loop playsInline aria-label={L("Pothole masks drawn by SAM 3.1 on a real ride", "असली राइड पर SAM 3.1 के गड्ढा निशान")} /> : <div className="hm-empty" />}
-      <figcaption className="hm-cap">
-        {f ? <><span><b>{f.count}</b> {L("potholes found", "गड्ढे मिले")}</span><span><b>{f.top_m2} m²</b> {L("largest", "सबसे बड़ा")}</span><span><b>{inr(f.inr)}</b> {L("to fix, estimated", "अनुमानित मरम्मत")}</span></>
-          : <span className="mut">{L("Loading the latest report", "ताज़ा रिपोर्ट लोड हो रही है")}</span>}
-      </figcaption>
-      {f && <p className="tiny hm-src">{L(`Live from report ${f.id}${f.ward ? ", " + f.ward : ""}. Faces and plates blurred.`, `रिपोर्ट ${f.id} से लाइव${f.ward ? ", " + f.ward : ""}। चेहरे व प्लेट धुंधले।`)}</p>}
-    </motion.figure>
+    <Ticket />
   </section>;
 }
 
@@ -225,8 +230,8 @@ function Privacy() {
     <Idx i="06" t={L("Privacy", "निजता")} />
     <div className="hm-privacy">
     <Lines lines={[L("Built so nobody gets exposed.", "ऐसा बना कि कोई उजागर न हो।")]} className="l-h2" />
-    <motion.ul className="hm-plist" variants={stagger} {...inView}>{P.map(([ic, t, d]) => <motion.li key={t} variants={up}>
-      <span className="pv-ico"><Icon n={ic} s={20} /></span><div><h3>{t}</h3><p className="mut">{d}</p></div></motion.li>)}</motion.ul>
+    <motion.ul className="hm-plist" variants={stagger} {...inView}>{P.map(([, t, d]) => <motion.li key={t} variants={up}>
+      <h3>{t}</h3><p className="mut">{d}</p></motion.li>)}</motion.ul>
     </div></section>;
 }
 
@@ -234,9 +239,8 @@ function CTA() {
   const L = useL();
   return <section className="l-sec">
     <div className="l-cta">
-      <img src="/brand/logo.svg" width={56} height={56} alt="" />
-      <Lines lines={[L("Seen a bad road today?", "आज कोई खराब सड़क दिखी?")]} className="l-h2" />
-      <motion.p variants={up} {...inView} className="l-sub">{L("It takes about a minute. The paperwork is on us.", "लगभग एक मिनट लगता है। कागज़ी काम हमारा।")}</motion.p>
+      <Lines lines={[L("Seen a bad road today? *File it before you forget.*", "आज कोई खराब सड़क दिखी? *भूलने से पहले दर्ज करें।*")]} className="l-h2" />
+      <motion.p variants={up} {...inView} className="l-sub">{L("About a minute from your phone. The letter, the right office and the follow-up a week later are on us.", "फ़ोन से लगभग एक मिनट। चिट्ठी, सही दफ़्तर और हफ़्ते बाद फॉलो-अप हमारा।")}</motion.p>
       <Magnetic><Link href="/new" className="btn primary xl cta">{L("Report a road", "सड़क रिपोर्ट करें")}<Icon n="arrow" s={18} /></Link></Magnetic>
     </div>
   </section>;
@@ -247,5 +251,5 @@ export default function Landing() {
   useEffect(() => { get("/stats").then(setS).catch(() => {}); }, []);
   useEffect(() => { if (s) requestAnimationFrame(() => ScrollTrigger.refresh()); }, [s]);
   return <MotionConfig reducedMotion="user"><S.Provider value={s}><Smooth />
-    <main className="wrap landing"><Hero /><Strip /><Problem /><Compare /><Send /><Agent /><Impact /><Privacy /><CTA /></main></S.Provider></MotionConfig>;
+    <main className="wrap landing"><Hero /><Problem /><Compare /><Send /><Agent /><Impact /><Privacy /><CTA /></main></S.Provider></MotionConfig>;
 }

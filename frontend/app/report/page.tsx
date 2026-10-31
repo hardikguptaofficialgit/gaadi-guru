@@ -51,7 +51,7 @@ function R() {
   const running = steps.length > 0 && !steps.some(s => s.kind === "done" || s.kind === "error");
   useEffect(() => { if (!id) return; const f = () => get(`/reports/${id}/agent`).then(setSteps).catch(() => {}); f(); const i = setInterval(f, 1500); return () => clearInterval(i); }, [id]);
   useEffect(() => { if (!running && steps.length) load(); }, [running]);
-  if (missing) return <main className="wrap narrow page"><div className="card empty"><span className="ico-tile"><Icon n="alert" s={28} /></span><h3>{H ? "रिपोर्ट नहीं मिली" : "We couldn't find that report"}</h3><Link className="btn primary" href="/new">{t("cta")}</Link></div></main>;
+  if (missing) return <main className="wrap narrow page"><div className="card empty"><Icon n="alert" s={24} /><h3>{H ? "रिपोर्ट नहीं मिली" : "We couldn't find that report"}</h3><Link className="btn primary" href="/new">{t("cta")}</Link></div></main>;
   if (!r) return <main className="wrap page" role="status" aria-label="Loading"><Sk h={48} r={999} /><div className="split"><Sk h={360} r={24} /><div className="stack"><Sk h={32} w="60%" /><Sk h={80} r={16} /><Sk h={80} r={16} /></div></div></main>;
   const total = r.potholes.reduce((a: number, p: any) => a + (p.repair?.inr_est || 0), 0);
   const counts = ["CRITICAL", "HIGH", "MEDIUM", "LOW"].map(s => [s, r.potholes.filter((p: any) => p.severity === s).length] as [string, number]).filter(x => x[1]);
@@ -61,8 +61,18 @@ function R() {
   const lastCall = [...steps].reverse().find(s => s.kind === "tool_call");
   const shareText = H ? `मैंने ${r.ward || "मेरे इलाके"} में ${r.potholes.length} गड्ढे रिपोर्ट किए। समर्थन करें:` : `I reported ${r.potholes.length} potholes in ${r.ward || "my area"}. Back it up:`;
   const body = cl === "hi" ? r.report?.body_hi : r.report?.body_en;
-  return <main className="wrap page">
-    <div className="narrow-c"><Stepper at={sent ? 3 : 2} /></div>
+  return <main className="wrap page rp">
+    <header className="doc-h">
+      <div className="doc-t"><span className="mono-t doc-id">PW-{r.id}</span><h1 className="doc-title">{r.report?.subject || `${r.potholes.length} ${t("found")}`}</h1></div>
+      <dl className="doc-meta">
+        <div><dt>{H ? "वार्ड" : "Ward"}</dt><dd>{r.ward || "—"}</dd></div>
+        <div><dt>{H ? "स्थान" : "Location"}</dt><dd className="mono-t">{r.lat != null ? `${(+r.lat).toFixed(4)}, ${(+r.lng).toFixed(4)}` : "—"}</dd></div>
+        <div><dt>{H ? "स्थिति" : "Status"}</dt><dd><StatusBadge s={r.status} hi={H} /></dd></div>
+        <div><dt>{H ? "प्राथमिकता" : "Priority"}</dt><dd>{r.report?.priority || "—"}</dd></div>
+        <div><dt>{H ? "फिर जांच" : "Re-check due"}</dt><dd className="mono-t">{r.followup_due || "—"}</dd></div>
+      </dl>
+      <div className="narrow-c doc-step"><Stepper at={sent ? 3 : 2} /></div>
+    </header>
     <section className="split">
       <div className="card sticky" style={{ padding: "var(--s2)" }}>{r.overlay ? <video className="media" style={{ aspectRatio: "16/10", objectFit: "cover" }} src={API + r.overlay} controls autoPlay muted loop playsInline />
         : r.potholes[0]?.image ? <img className="media" src={API + r.potholes[0].image} alt="" /> : <div className="media" style={{ aspectRatio: "16/10" }} />}</div>
@@ -70,7 +80,7 @@ function R() {
         <div className="stack gap-2"><div className="row between"><span className="eyebrow">{r.ward || ""}</span><div className="row gap-1"><StatusBadge s={r.status} hi={H} /><VerdictBadge v={r.verification?.verdict} hi={H} /></div></div>
           <h2 data-testid="found">{r.potholes.length} {t("found")}</h2></div>
         <div className="stats">
-          <div className="well stack gap-2"><span className="tiny">{t("howbad")}</span><div className="sev-row">{counts.length ? counts.map(([s, n]) => <span key={s} className={"pill " + s}>{n} {HOWBAD[s][L]}</span>) : <span className="mut small">—</span>}</div></div>
+          <div className="well stack gap-2"><span className="tiny">{t("howbad")}</span><ul className="sev-list">{counts.length ? counts.map(([s, n]) => <li key={s} className={"sv " + s}><i /><span>{HOWBAD[s][L]}</span><b className="mono-t">{n}</b></li>) : <li className="mut small">—</li>}</ul></div>
           <div className="well stat"><b>{inr(total)}</b><span>{t("fix")}</span></div></div>
         {r.voice?.transcript && <div className="well stack gap-1"><span className="tiny row gap-1"><Icon n="mic" s={14} />{H ? "आपने कहा" : "You said"}</span><p className="small">{r.voice.transcript}</p></div>}
         {r.upvotes > 0 && <span className="tiny row gap-1"><Icon n="thumb" s={14} />{r.upvotes} {H ? "लोगों ने समर्थन किया" : "neighbours backed this"}</span>}
