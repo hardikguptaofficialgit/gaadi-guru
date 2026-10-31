@@ -1,5 +1,5 @@
 {
-  "name": "gaadi-guru-web",
+  "name": "patchwise-web",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
+    "@supabase/supabase-js": "^2.118.0",
     "framer-motion": "^14.8.0",
     "gsap": "^3.15.0",
     "leaflet": "1.9.4",

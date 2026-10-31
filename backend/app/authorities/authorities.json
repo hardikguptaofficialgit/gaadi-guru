@@ -1,0 +1,782 @@
+[
+  {
+    "city": "Delhi",
+    "country": "IN",
+    "authority": "Municipal Corporation of Delhi (MCD)",
+    "ward_note": "Covers most of Delhi except NDMC area, Cantonment, and PWD arterial roads (60ft+).",
+    "emails": [
+      {
+        "email": "mcd-ithelpdesk@mcd.nic.in",
+        "purpose": "Listed on MCD feedback page under 'If any complaint' (officially an IT helpdesk; use as secondary)",
+        "confidence": "medium"
+      }
+    ],
+    "phone": "155305",
+    "portal_url": "https://mcdonline.nic.in/portal/feedback (MCD 311 app)",
+    "portal_fields": [
+      "Login (mobile OTP) in MCD 311 app",
+      "Category: Potholes on roads",
+      "Photo",
+      "Location (GPS)",
+      "Description"
+    ],
+    "categories": "MCD 311: 'Potholes on roads' (per MCD circular)",
+    "sources": [
+      "https://mcdonline.nic.in/portal/feedback",
+      "https://mcdonline.nic.in/portal/contactUs",
+      "https://mcdonline.nic.in/portal/downloadFile/circular_reg._complaints_lodged_on_mcd_311_app_230824113534834.pdf"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "high",
+      "email": "medium",
+      "portal": "high",
+      "fields": "low (app fields not directly inspected)"
+    }
+  },
+  {
+    "city": "Delhi",
+    "country": "IN",
+    "authority": "New Delhi Municipal Council (NDMC)",
+    "ward_note": "Only Lutyens' Delhi / NDMC area.",
+    "emails": [
+      {
+        "email": "care@ndmc.gov.in",
+        "purpose": "NDMC care/complaints (from search summary of smartcity.ndmc.gov.in contact page)",
+        "confidence": "medium"
+      }
+    ],
+    "phone": "1533",
+    "portal_url": "https://smartcity.ndmc.gov.in/content/projects/project-details/ndmc-311-app",
+    "portal_fields": [
+      "NDMC-311 app: category",
+      "photo",
+      "location",
+      "description"
+    ],
+    "categories": "Roads > Pothole (per NDMC roads FAQ: report via Control Room, NDMC-311 or Road Service Centre)",
+    "sources": [
+      "https://ndmc.gov.in/faq/civil_roads_faqs.aspx",
+      "https://smartcity.ndmc.gov.in/content/contact-us/contact-us"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "medium",
+      "email": "medium",
+      "portal": "high",
+      "fields": "low"
+    }
+  },
+  {
+    "city": "Delhi",
+    "country": "IN",
+    "authority": "Public Works Department, GNCTD (PWD Delhi)",
+    "ward_note": "Arterial roads 60ft+ width are PWD, not MCD.",
+    "emails": [],
+    "phone": "1908 (toll-free); WhatsApp 8130188222",
+    "portal_url": "https://pwdsewa.pwddelhi.gov.in/Home/SubmitComplaint/",
+    "portal_fields": [
+      "Name",
+      "Mobile (OTP)",
+      "Road / location",
+      "Complaint type",
+      "Photo",
+      "Description"
+    ],
+    "categories": "Road / Pothole",
+    "sources": [
+      "https://pwdsewa.pwddelhi.gov.in/Home/SubmitComplaint/"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "medium",
+      "email": "n/a — complaint@pwddelhi.com seen but not a .gov.in domain, excluded",
+      "portal": "high (page returned 500 on fetch)",
+      "fields": "low (unverified)"
+    }
+  },
+  {
+    "city": "Mumbai",
+    "country": "IN",
+    "authority": "Brihanmumbai Municipal Corporation (BMC/MCGM)",
+    "ward_note": "24 administrative wards; MARG routes automatically.",
+    "emails": [
+      {
+        "email": "mobile.support@mcgm.gov.in",
+        "purpose": "App support only, not for complaints",
+        "confidence": "high"
+      }
+    ],
+    "phone": "1916 (24x7); WhatsApp chatbot +91 8999228999 (keyword 'Pothole')",
+    "portal_url": "https://marg.mcgm.gov.in (MyBMC MARG)",
+    "portal_fields": [
+      "Language",
+      "Citizen login: phone + OTP",
+      "Allow location",
+      "New Registration",
+      "Grievance Type (select Pothole)",
+      "Brief description",
+      "Geo-tagged photo",
+      "Updates via phone/email or anonymous",
+      "Submit -> 15-char Grievance ID"
+    ],
+    "categories": "MyBMC MARG grievance type: Pothole (Pothole QuickFix merged into MARG, 114 categories)",
+    "sources": [
+      "https://marg.mcgm.gov.in/MARGUserManual/marg_web_citizen/citizenmanual.html",
+      "https://portal.mcgm.gov.in/irj/portal/anonymous?NavigationTarget=navurl%3A%2F%2F292767acb759a47eeb3b07911ad27c98&guest_user=english",
+      "https://indianexpress.com/article/cities/mumbai/bmc-launches-mobile-app-residents-pothole-10061189/"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "high",
+      "email": "high (support only)",
+      "portal": "high",
+      "fields": "high"
+    }
+  },
+  {
+    "city": "Bengaluru",
+    "country": "IN",
+    "authority": "BBMP / Greater Bengaluru Authority city corporations",
+    "ward_note": "BBMP was split in 2025 into 5 city corporations under GBA; Sahaaya 2.0 still the common grievance app.",
+    "emails": [
+      {
+        "email": "comm@bbmp.gov.in",
+        "purpose": "Commissioner / head office",
+        "confidence": "high"
+      }
+    ],
+    "phone": "1533 (toll-free)",
+    "portal_url": "https://play.google.com/store/apps/details?id=com.nammabengaluruNew.org (Namma Bengaluru / Sahaaya 2.0; also 'Fix Pothole' app)",
+    "portal_fields": [
+      "Login (mobile OTP)",
+      "Department: BBMP/corporation",
+      "Category: Road / Pothole",
+      "Text, photo or video",
+      "Location"
+    ],
+    "categories": "Sahaaya 2.0 > Roads > Potholes",
+    "sources": [
+      "https://site.bbmp.gov.in/contact.html",
+      "https://suraksha75.bbmpgov.in/home",
+      "https://webapps.bbmpgov.in/potholesdashboard/index.html"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "high",
+      "email": "high",
+      "portal": "high",
+      "fields": "low"
+    }
+  },
+  {
+    "city": "Chennai",
+    "country": "IN",
+    "authority": "Greater Chennai Corporation (GCC)",
+    "ward_note": "200 wards / 15 zones.",
+    "emails": [],
+    "phone": "1913 (24x7)",
+    "portal_url": "https://erp.chennaicorporation.gov.in/pgr/ (also Namma Chennai app)",
+    "portal_fields": [
+      "Complaint Type (frequently filed list or master list)",
+      "Location / zone / ward",
+      "Complaint details",
+      "Name, mobile, email",
+      "Submit Complaint -> Complaint Number"
+    ],
+    "categories": "Roads > Pothole / Damaged road",
+    "sources": [
+      "https://gccservices.chennaicorporation.gov.in/pgr/home",
+      "https://erp.chennaicorporation.gov.in/pgr/citizen/BeforeReg.do",
+      "https://chennaicorporation.gov.in/gcc/who-is-who/index_data.jsp"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "high",
+      "email": "n/a (only IT cell email published)",
+      "portal": "high",
+      "fields": "medium"
+    }
+  },
+  {
+    "city": "Hyderabad",
+    "country": "IN",
+    "authority": "Greater Hyderabad Municipal Corporation (GHMC)",
+    "ward_note": "Some areas now under Cyberabad / Malkajgiri corporations; same grievance system.",
+    "emails": [
+      {
+        "email": "commissioner-ghmc@gov.in",
+        "purpose": "Commissioner escalation (from third-party guide; not confirmed on ghmc.gov.in)",
+        "confidence": "low"
+      }
+    ],
+    "phone": "040-21111111",
+    "portal_url": "https://igs.ghmc.gov.in/operator/send_otp_mobile (MyGHMC app)",
+    "portal_fields": [
+      "Mobile + OTP",
+      "Citizen entry form: ward",
+      "Grievance type",
+      "Description",
+      "Photo (app)"
+    ],
+    "categories": "Engineering / Roads > Potholes",
+    "sources": [
+      "https://www.ghmc.gov.in/KeyContacts.aspx"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "high",
+      "email": "low",
+      "portal": "medium",
+      "fields": "low"
+    }
+  },
+  {
+    "city": "Kolkata",
+    "country": "IN",
+    "authority": "Kolkata Municipal Corporation (KMC)",
+    "ward_note": "Must give ward number; roads email covers Boroughs I–V only.",
+    "emails": [
+      {
+        "email": "eecl_roads_civil@kmcgov.in",
+        "purpose": "Roads (Civil) Executive Engineer, Boroughs I–V (search summary of KMC public list)",
+        "confidence": "medium"
+      }
+    ],
+    "phone": "1800-345-3375 (toll-free); Control Room 033-2286-1212",
+    "portal_url": "https://www.kmcgov.in/KMCPortal/ComplaintFormAction.do",
+    "portal_fields": [
+      "1a Full Name",
+      "1b Address",
+      "1c Contact Number",
+      "1d Email Id",
+      "2a Complaint Code = 12",
+      "2b Location of Road/Footpath + Ward No.",
+      "2c Reason for Complaint (optional)"
+    ],
+    "categories": "Code 12: Repair of potholes in Roads / Footpath and related",
+    "sources": [
+      "https://www.kmcgov.in/KMCPortal/ComplaintFormAction.do",
+      "https://www.kmcgov.in/KMCPortal/jsp/KmcContact.jsp",
+      "https://www.kmcgov.in/KMCPortal/jsp/StatepublicList.jsp"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "medium",
+      "email": "medium",
+      "portal": "high",
+      "fields": "high"
+    }
+  },
+  {
+    "city": "Pune",
+    "country": "IN",
+    "authority": "Pune Municipal Corporation (PMC)",
+    "ward_note": "Road Mitra auto-routes to responsible engineer.",
+    "emails": [],
+    "phone": "1800-103-0222 (toll-free)",
+    "portal_url": "https://webadmin.pmc.gov.in/citizen-services (PMC CARE; Pune Road Mitra app)",
+    "portal_fields": [
+      "Photo/video",
+      "GPS location",
+      "Complaint type: road/pothole",
+      "Mobile"
+    ],
+    "categories": "Road Mitra: bad road / pothole",
+    "sources": [
+      "https://opendata.pmc.gov.in/opendata/PMCReports/PMC-CARE-Booklet.pdf",
+      "https://indianexpress.com/article/cities/pune/pune-road-mitra-pmc-launches-app-for-citizens-to-lodge-track-complaints-on-bad-roads-10185429/"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "medium",
+      "email": "n/a — info@punecorporation.org not .gov.in, excluded",
+      "portal": "medium",
+      "fields": "low"
+    }
+  },
+  {
+    "city": "Ahmedabad",
+    "country": "IN",
+    "authority": "Amdavad Municipal Corporation (AMC) – CCRS",
+    "ward_note": "Give ward and exact road.",
+    "emails": [],
+    "phone": "155303 (24x7); SMS 'AMCCRS NEW' to 56767",
+    "portal_url": "https://amccrs.apphost.in/AMCPortal/Complaint/Register",
+    "portal_fields": [
+      "Name / mobile",
+      "Zone / ward",
+      "Complaint category (Roads)",
+      "Location / address",
+      "Description"
+    ],
+    "categories": "Engineering > Road / Pothole",
+    "sources": [
+      "https://amccrs.apphost.in/AMCPortal/Complaint/Register",
+      "https://amccrs.apphost.in/AMCPortal/Home/FAQ"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "high",
+      "email": "n/a",
+      "portal": "medium (hosted on non-gov domain apphost.in, linked as official CCRS)",
+      "fields": "low"
+    }
+  },
+  {
+    "city": "Jaipur",
+    "country": "IN",
+    "authority": "Jaipur Municipal Corporation Greater",
+    "ward_note": "Greater vs Heritage split by ward; check ward first.",
+    "emails": [],
+    "phone": "0141-2747400 (8AM–10PM); Rajasthan Sampark 181",
+    "portal_url": "https://samadhan.jaipurmc.org/",
+    "portal_fields": [
+      "Name, mobile",
+      "Zone / ward",
+      "Complaint type",
+      "Address",
+      "Description",
+      "Photo"
+    ],
+    "categories": "Roads / Pothole",
+    "sources": [
+      "https://jaipurmc.org/Presentation/Others/ConctactUs.aspx",
+      "https://sampark.rajasthan.gov.in/"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "medium",
+      "email": "n/a",
+      "portal": "medium (.org domain)",
+      "fields": "low"
+    }
+  },
+  {
+    "city": "Jaipur",
+    "country": "IN",
+    "authority": "Jaipur Municipal Corporation Heritage",
+    "ward_note": "Walled city / heritage wards.",
+    "emails": [],
+    "phone": "181 (Rajasthan Sampark)",
+    "portal_url": "https://samadhan.jaipurmcheritage.org/ComplaintRegistrationByWebsite/AddComplaintRegistrationByWebsite",
+    "portal_fields": [
+      "Name, mobile",
+      "Ward",
+      "Complaint type",
+      "Address",
+      "Description"
+    ],
+    "categories": "Roads",
+    "sources": [
+      "https://samadhan.jaipurmcheritage.org/ComplaintRegistrationByWebsite/AddComplaintRegistrationByWebsite",
+      "https://sampark.rajasthan.gov.in/"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "medium",
+      "email": "n/a",
+      "portal": "medium",
+      "fields": "low"
+    }
+  },
+  {
+    "city": "Lucknow",
+    "country": "IN",
+    "authority": "Lucknow Nagar Nigam (LMC)",
+    "ward_note": "",
+    "emails": [
+      {
+        "email": "nnlko@nic.in",
+        "purpose": "Nagar Nigam general/complaints",
+        "confidence": "high"
+      }
+    ],
+    "phone": "1533 (toll-free); WhatsApp 9219902911-14",
+    "portal_url": "https://www.lucknowsmartcity.com/ (E-Complaint)",
+    "portal_fields": [
+      "Name, mobile",
+      "Zone/ward",
+      "Complaint type",
+      "Location",
+      "Description"
+    ],
+    "categories": "Roads / Pothole",
+    "sources": [
+      "https://lmc.up.nic.in/helpline.aspx"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "high",
+      "email": "high",
+      "portal": "medium",
+      "fields": "low"
+    }
+  },
+  {
+    "city": "Bhubaneswar",
+    "country": "IN",
+    "authority": "Bhubaneswar Municipal Corporation (BMC Odisha)",
+    "ward_note": "",
+    "emails": [
+      {
+        "email": "grievance@bmc.gov.in",
+        "purpose": "Grievances (bmc.gov.in help desk)",
+        "confidence": "medium"
+      }
+    ],
+    "phone": "1929 (24x7 toll-free)",
+    "portal_url": "https://citizenservices.bhubaneswar.me/grievance/complaint-registration/grievance",
+    "portal_fields": [
+      "Mobile/OTP",
+      "Ward",
+      "Grievance category",
+      "Location",
+      "Description",
+      "Photo"
+    ],
+    "categories": "Roads",
+    "sources": [
+      "https://www.bmc.gov.in/help-desk"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "medium",
+      "email": "medium (from search summary of help-desk page)",
+      "portal": "medium",
+      "fields": "low"
+    }
+  },
+  {
+    "city": "National",
+    "country": "IN",
+    "authority": "CPGRAMS (DARPG, Govt of India)",
+    "ward_note": "For escalation when city doesn't act; choose State Govt.",
+    "emails": [],
+    "phone": "1800-11-1555 (unverified this run)",
+    "portal_url": "https://pgportal.gov.in/",
+    "portal_fields": [
+      "Register/login (mobile/email OTP)",
+      "Name, gender, address, state, district, pincode",
+      "Grievance against: Ministry/Department or State Government",
+      "Category / sub-category",
+      "Grievance description (≤4000 chars)",
+      "Supporting document PDF (optional)",
+      "Submit -> Registration number"
+    ],
+    "categories": "State Government > Urban Development / Municipal",
+    "sources": [
+      "https://pgportal.gov.in/CPGOFFICE/Documents/CPGRAMS-Help.pdf",
+      "https://www.darpg.gov.in/en/public-grievances"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "low",
+      "email": "n/a",
+      "portal": "high",
+      "fields": "medium"
+    }
+  },
+  {
+    "city": "National",
+    "country": "IN",
+    "authority": "Swachhata-MoHUA app",
+    "ward_note": "Sanitation-only categories; NOT for potholes — use only for road debris/garbage.",
+    "emails": [],
+    "phone": "1969",
+    "portal_url": "https://play.google.com/store/apps/details?id=com.ichangemycity.swachhbharat",
+    "portal_fields": [
+      "Photo",
+      "Location",
+      "Category"
+    ],
+    "categories": "Garbage dump, Garbage vehicle not arrived, Dustbins not cleaned, Sweeping not done, Dead animal, Public toilet issues (no pothole category)",
+    "sources": [
+      "https://play.google.com/store/apps/details?hl=en&id=com.ichangemycity.swachhbharat"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "medium",
+      "email": "n/a",
+      "portal": "high",
+      "fields": "medium"
+    }
+  },
+  {
+    "city": "New York City",
+    "country": "US",
+    "authority": "NYC DOT via NYC311",
+    "ward_note": "Highways use a separate 'Pothole or Cave-In on Highway' page; vehicle damage = City Claim.",
+    "emails": [],
+    "phone": "311 / 212-NEW-YORK (212-639-9675)",
+    "portal_url": "https://portal.311.nyc.gov/article/?kanumber=KA-01093",
+    "portal_fields": [
+      "Problem: Pothole Complaint",
+      "Location (address / intersection, incl. bike lane)",
+      "Description",
+      "Photo/video (optional)",
+      "Contact info (optional)"
+    ],
+    "categories": "Street Condition > Pothole (cave-in separate; not inside repaired patch or next to catch basin)",
+    "sources": [
+      "https://portal.311.nyc.gov/article/?kanumber=KA-01093"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "high",
+      "email": "n/a",
+      "portal": "high",
+      "fields": "medium"
+    }
+  },
+  {
+    "city": "Los Angeles",
+    "country": "US",
+    "authority": "StreetsLA (Bureau of Street Services) via MyLA311",
+    "ward_note": "",
+    "emails": [],
+    "phone": "311 / 213-473-3231",
+    "portal_url": "https://streets.lacity.gov/services/report-pothole",
+    "portal_fields": [
+      "Service Request type: Street Problem/Repair > Pothole - Small Asphalt Repair",
+      "Address or intersection",
+      "Details",
+      "Photo (optional)",
+      "Contact"
+    ],
+    "categories": "Pothole - Small Asphalt Repair",
+    "sources": [
+      "https://streets.lacity.gov/services/report-pothole"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "medium (out-of-area number from memory)",
+      "email": "n/a",
+      "portal": "high",
+      "fields": "medium"
+    }
+  },
+  {
+    "city": "Chicago",
+    "country": "US",
+    "authority": "Chicago DOT via CHI311",
+    "ward_note": "Utility cuts/sinkholes reported separately.",
+    "emails": [],
+    "phone": "311 / 312-744-5000",
+    "portal_url": "https://www.chicago.gov/city/en/depts/cdot/provdrs/street/svcs/report_a_pot_holeinstreet.html",
+    "portal_fields": [
+      "Request type: Pothole in Street",
+      "Exact location",
+      "Details",
+      "Contact (optional)"
+    ],
+    "categories": "Pothole in Street",
+    "sources": [
+      "https://www.chicago.gov/city/en/depts/cdot/provdrs/street/svcs/report_a_pot_holeinstreet.html",
+      "https://311.chicago.gov/s/article/Potholes?language=en_US"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "medium",
+      "email": "n/a",
+      "portal": "high",
+      "fields": "medium"
+    }
+  },
+  {
+    "city": "Houston",
+    "country": "US",
+    "authority": "Houston 311 (routes to Public Works)",
+    "ward_note": "",
+    "emails": [
+      {
+        "email": "houston311@houstontx.gov",
+        "purpose": "Submit service requests",
+        "confidence": "high"
+      },
+      {
+        "email": "311@houstontx.gov",
+        "purpose": "Contact 311",
+        "confidence": "high"
+      }
+    ],
+    "phone": "311 / 713-837-0311",
+    "portal_url": "https://houston311.powerappsportals.us/en-US/",
+    "portal_fields": [
+      "Request type: Pothole",
+      "Precise location",
+      "Description",
+      "Contact (optional/anonymous)"
+    ],
+    "categories": "Street & Drainage > Pothole",
+    "sources": [
+      "https://houstontx.gov/311/faq.html"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "high",
+      "email": "high",
+      "portal": "high",
+      "fields": "low"
+    }
+  },
+  {
+    "city": "Phoenix",
+    "country": "US",
+    "authority": "City of Phoenix Street Transportation Dept",
+    "ward_note": "Potholes NOT accepted via myPHX311 online — phone hotline.",
+    "emails": [],
+    "phone": "602-262-6441 (24/7)",
+    "portal_url": "https://myphx311.phoenix.gov/streetmaintenance/",
+    "portal_fields": [
+      "Phone report: location, description"
+    ],
+    "categories": "Street Maintenance > Pothole",
+    "sources": [
+      "https://myphx311.phoenix.gov/streetmaintenance/",
+      "https://www.phoenix.gov/administration/departments/streets/contact-us.html"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "high",
+      "email": "n/a",
+      "portal": "high",
+      "fields": "low"
+    }
+  },
+  {
+    "city": "Philadelphia",
+    "country": "US",
+    "authority": "Philadelphia Streets Department via Philly311",
+    "ward_note": "State roads -> PennDOT.",
+    "emails": [],
+    "phone": "311 / 215-686-8686",
+    "portal_url": "https://www.phila.gov/services/streets-sidewalks-alleys/report-a-problem-on-a-city-street-sidewalk-or-alley/report-a-pothole-or-other-street-damage/",
+    "portal_fields": [
+      "Category: Pothole",
+      "Location",
+      "Description",
+      "Photo",
+      "Contact"
+    ],
+    "categories": "Street Defect / Pothole",
+    "sources": [
+      "https://www.phila.gov/services/streets-sidewalks-alleys/report-a-problem-on-a-city-street-sidewalk-or-alley/report-a-pothole-or-other-street-damage/"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "medium",
+      "email": "n/a",
+      "portal": "high",
+      "fields": "low"
+    }
+  },
+  {
+    "city": "San Francisco",
+    "country": "US",
+    "authority": "SF Public Works via SF311",
+    "ward_note": "",
+    "emails": [],
+    "phone": "311 / 415-701-2311",
+    "portal_url": "https://www.sf.gov/report-pothole-and-street-issues",
+    "portal_fields": [
+      "Location",
+      "Nature of request (Pavement defect / pothole)",
+      "Photo",
+      "Email (optional, for tracking)"
+    ],
+    "categories": "Street and Sidewalk Defect > Pavement defect (pothole)",
+    "sources": [
+      "https://www.sf.gov/report-pothole-and-street-issues"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "high",
+      "email": "n/a",
+      "portal": "high",
+      "fields": "high"
+    }
+  },
+  {
+    "city": "Seattle",
+    "country": "US",
+    "authority": "Seattle DOT via Find It, Fix It",
+    "ward_note": "",
+    "emails": [],
+    "phone": "206-684-2489 (684-CITY)",
+    "portal_url": "https://www.seattle.gov/customer-service-bureau/find-it-fix-it-mobile-app",
+    "portal_fields": [
+      "Category: Potholes",
+      "Location (map)",
+      "Photo",
+      "Description",
+      "Contact"
+    ],
+    "categories": "Potholes",
+    "sources": [
+      "https://www.seattle.gov/customer-service-bureau/find-it-fix-it-mobile-app"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "medium",
+      "email": "n/a",
+      "portal": "high",
+      "fields": "low"
+    }
+  },
+  {
+    "city": "Boston",
+    "country": "US",
+    "authority": "Boston Public Works via BOS:311",
+    "ward_note": "",
+    "emails": [],
+    "phone": "311 / 617-635-4500",
+    "portal_url": "https://www.boston.gov/departments/boston-311",
+    "portal_fields": [
+      "Type: Pothole",
+      "Location",
+      "Description",
+      "Photo",
+      "Contact"
+    ],
+    "categories": "Public Works > Highway Maintenance > Request for Pothole Repair",
+    "sources": [
+      "https://www.boston.gov/departments/boston-311",
+      "https://311.boston.gov/tickets?filter=Public+Works+Department%3AHighway+Maintenance%3ARequest+for+Pothole+Repair"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "high",
+      "email": "n/a",
+      "portal": "high",
+      "fields": "medium"
+    }
+  },
+  {
+    "city": "Austin",
+    "country": "US",
+    "authority": "Austin Transportation & Public Works via Austin 3-1-1",
+    "ward_note": "",
+    "emails": [],
+    "phone": "311 / 512-974-2000",
+    "portal_url": "https://www.austintexas.gov/services/request-sidewalk-or-street-repair",
+    "portal_fields": [
+      "Request type: Pothole repair",
+      "Location",
+      "Description",
+      "Photo",
+      "Contact"
+    ],
+    "categories": "Street / Pothole Repair",
+    "sources": [
+      "https://www.austintexas.gov/services/request-sidewalk-or-street-repair"
+    ],
+    "checked": "2026-10-31",
+    "confidence": {
+      "phone": "medium",
+      "email": "n/a",
+      "portal": "high",
+      "fields": "low"
+    }
+  }
+]

@@ -20,7 +20,7 @@ def _rle(mask: np.ndarray) -> dict:
 
 def export(rids: list[str], every: int = 4) -> bytes:
     """Zip with images/ + annotations.json. Every `every`-th frame that has a kept pothole track."""
-    coco = {"info": {"description": "Gaadi Guru Indian road potholes — SAM 3.1 masks", "version": "0.1"},
+    coco = {"info": {"description": "Patchwise Indian road potholes — SAM 3.1 masks", "version": "0.1"},
             "licenses": [{"id": 1, "name": "CC BY 4.0"}],
             "categories": [{"id": 1, "name": "pothole", "supercategory": "road_damage"}],
             "images": [], "annotations": []}

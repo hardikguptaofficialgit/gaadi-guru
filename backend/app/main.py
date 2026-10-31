@@ -1,13 +1,13 @@
-import json
+import json, os
 from pathlib import Path
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
-from . import pipeline, coco
+from . import pipeline, coco, routing
 
-app = FastAPI(title="Gaadi Guru API")
+app = FastAPI(title="Patchwise API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.mount("/media", StaticFiles(directory=pipeline.DATA), name="media")
 
@@ -139,14 +139,14 @@ def _load(rid: str) -> dict:
 def coco_one(rid: str):
     _load(rid)
     return Response(coco.export([rid]), media_type="application/zip",
-                    headers={"Content-Disposition": f'attachment; filename="gaadi-guru-{rid}-coco.zip"'})
+                    headers={"Content-Disposition": f'attachment; filename="patchwise-{rid}-coco.zip"'})
 
 
 @app.get("/dataset/coco")
 def coco_all():
     rids = [p.parent.name for p in pipeline.DATA.glob("*/result.json")]
     return Response(coco.export(rids), media_type="application/zip",
-                    headers={"Content-Disposition": 'attachment; filename="gaadi-guru-coco.zip"'})
+                    headers={"Content-Disposition": 'attachment; filename="patchwise-coco.zip"'})
 
 
 class FileReq(BaseModel):
@@ -290,24 +290,48 @@ def frame(rid: str, kind: str = "raw", i: int | None = None):
     return Response(b.tobytes(), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=3600"})
 
 
-_GEO: dict = {}
-
-
 @app.get("/geo/reverse")
 def geo_reverse(lat: float, lng: float):
-    """Real locality name from OpenStreetMap Nominatim (cached, 1 req per point)."""
-    import httpx
-    k = (round(lat, 4), round(lng, 4))
-    if k not in _GEO:
-        try:
-            j = httpx.get("https://nominatim.openstreetmap.org/reverse", params={"lat": lat, "lon": lng, "format": "jsonv2", "zoom": 16},
-                          headers={"User-Agent": "gaadi-guru-hackathon/1.0"}, timeout=8).json()
-            a = j.get("address", {})
-            _GEO[k] = {"locality": a.get("suburb") or a.get("neighbourhood") or a.get("quarter") or a.get("city_district") or a.get("road"),
-                       "city": a.get("city") or a.get("town") or a.get("state_district"), "display": j.get("display_name"), "source": "OpenStreetMap Nominatim"}
-        except Exception as e:
-            return {"error": str(e)[:200]}
-    return _GEO[k]
+    """Locality from OpenStreetMap Nominatim, via the shared policy-compliant client (UA, 1 req/s, disk cache)."""
+    g = routing.reverse(lat, lng)
+    if not g:
+        return {"error": "geocoder unavailable"}
+    return {"locality": g.get("suburb") or g.get("road"), "city": g.get("city") or g.get("state_district"), "display": g.get("display"), "source": g["source"]}
+
+
+def _site(site: str | None) -> str:
+    return site or os.getenv("PUBLIC_SITE_URL", "http://localhost:3000")
+
+
+def _api(api: str | None) -> str:
+    return api or os.getenv("PUBLIC_API_URL", "http://localhost:8000")
+
+
+@app.get("/authorities")
+def authorities_list():
+    return {"cities": routing.CITIES, "authorities": [routing.public_contact(a) for a in routing.AUTH]}
+
+
+@app.get("/reports/{rid}/route")
+def report_route(rid: str, city: str | None = None, pick: str | None = None):
+    """Who should get this report: reverse-geocoded city (user can override), Delhi jurisdiction choice, verified contacts."""
+    return routing.route(_load(rid), city=city, pick=pick)
+
+
+@app.get("/reports/{rid}/mailto")
+def report_mailto(rid: str, authority: str, site: str | None = None, api: str | None = None):
+    m = routing.mailto(_load(rid), authority, _site(site), _api(api))
+    if m.get("error") == "unknown authority":
+        raise HTTPException(404, "unknown authority")
+    return m
+
+
+@app.get("/reports/{rid}/portal-format")
+def report_portal_format(rid: str, authority: str, site: str | None = None, api: str | None = None):
+    p = routing.portal_format(_load(rid), authority, _site(site), _api(api))
+    if p.get("error"):
+        raise HTTPException(404, p["error"])
+    return p
 
 
 @app.get("/wards")

@@ -19,7 +19,7 @@ def test_api():
     for p in src.iterdir():
         if p.is_dir() and (p / "result.json").exists(): shutil.copytree(p, tmp / p.name)
     if (src / "followups.json").exists(): shutil.copy(src / "followups.json", tmp / "followups.json")
-    env = {**os.environ, "GG_DATA": str(tmp), "GG_FAKE_META": "1", "META_SPEND_LIMIT_USD": "0"}
+    env = {**os.environ, "GG_DATA": str(tmp), "GG_FAKE_META": "1", "META_SPEND_LIMIT_USD": "0", "GG_OFFLINE_GEO": "1"}
     proc = subprocess.Popen([sys.executable, "-m", "uvicorn", "app.main:app", "--port", "8011"], cwd=ROOT / "backend", env=env,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     for _ in range(100):

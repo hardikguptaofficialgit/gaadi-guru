@@ -3,8 +3,8 @@ import Link from "next/link";
 import { load, summary } from "./data";
 // Public share page: crawlers (WhatsApp, X) read the OG tags; people get a summary and a link into the app.
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const r = await load(params.id); if (!r) return { title: "Gaadi Guru" };
-  const s = summary(r); const title = `${s.n} road hazards reported in ${s.ward} · Gaadi Guru`;
+  const r = await load(params.id); if (!r) return { title: "Patchwise" };
+  const s = summary(r); const title = `${s.n} road hazards reported in ${s.ward} · Patchwise`;
   const description = `Repair estimate ₹${Math.round(s.total).toLocaleString("en-IN")}. Status: ${s.status}${s.verdict ? `, re-ride: ${s.verdict.split(" (")[0]}` : ""}. Back it up with one tap.`;
   return { title, description, openGraph: { title, description, type: "article" }, twitter: { card: "summary_large_image", title, description } };
 }

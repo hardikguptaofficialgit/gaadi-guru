@@ -16,3 +16,5 @@ samples/*.wav
 frontend/tsconfig.tsbuildinfo
 samples/*.ogg
 backend/data_archive/
+!.env.example
+!**/.env.example

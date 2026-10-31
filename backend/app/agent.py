@@ -1,4 +1,4 @@
-"""Gaadi Guru civic agent: Muse Spark plans and calls tools; every step is streamed to the UI timeline.
+"""Patchwise civic agent: Muse Spark plans and calls tools; every step is streamed to the UI timeline.
 
 Tools: analyze_video, check_duplicates, estimate_repair_cost, draft_complaint,
 file_complaint (Muse Wonder pre-fills the portal, stops before final submit),
@@ -25,7 +25,7 @@ TOOLS = [
         ("verify_repair", "Compare a later re-ride report against the original to see which hazards are fixed.", {"report_id": {"type": "string"}, "reride_report_id": {"type": "string"}}),
     ]]
 
-SYSTEM = """You are Gaadi Guru, an autonomous civic agent for Indian roads. Goal: turn a citizen's ride video into an
+SYSTEM = """You are Patchwise, an autonomous civic agent for Indian roads. Goal: turn a citizen's ride video into an
 actionable, non-duplicate municipal complaint and make sure it gets fixed. Work step by step using the tools:
 1) analyze_video 2) check_duplicates (radius 50 m) 3) estimate_repair_cost 4) draft_complaint
 5) file_complaint (unless an open duplicate already exists) 6) schedule_followup in 7 days

@@ -32,7 +32,7 @@ export function LangProvider({ children }: { children: React.ReactNode }) {
 export const useT = () => useContext(C);
 export const HOWBAD: Record<string, [string, string]> = { CRITICAL: ["Dangerous", "खतरनाक"], HIGH: ["Bad", "खराब"], MEDIUM: ["Okay-ish", "ठीक-ठाक"], LOW: ["Minor", "हल्का"] };
 export const mine = { get: (): string[] => { try { return JSON.parse(localStorage.getItem("mine") || "[]"); } catch { return []; } },
-  add: (id: string) => { const m = mine.get().filter(x => x !== id); localStorage.setItem("mine", JSON.stringify([id, ...m])); } };
+  add: (id: string) => { const m = mine.get().filter(x => x !== id); localStorage.setItem("mine", JSON.stringify([id, ...m])); window.dispatchEvent(new CustomEvent("mine:add", { detail: id })); } };
 export function Stepper({ at }: { at: 1 | 2 | 3 }) {
   const { t } = useT();
   return <ol className="stepper" aria-label="Progress">{(["s1", "s2", "s3"] as K[]).map((k, i) =>

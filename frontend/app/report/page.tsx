@@ -5,6 +5,7 @@ import Link from "next/link";
 import { API, get, inr } from "../api";
 import { useT, Stepper, Share, HOWBAD, mine } from "../i18n";
 import Timeline from "../Timeline";
+import Authorities from "./Authorities";
 import Icon from "../Icon";
 import { Modal, Sk, StatusBadge, VerdictBadge, Tabs, useToast } from "../ui";
 const HUMAN: Record<string, [string, string]> = { analyze_video: ["Looking at your ride", "राइड देख रहे हैं"], check_duplicates: ["Checking if someone already reported it", "देख रहे हैं कि पहले किसी ने रिपोर्ट किया या नहीं"],
@@ -105,6 +106,7 @@ function R() {
       <h3>{r.report.subject}</h3>
       <div className="well"><pre className="small">{body || ""}</pre></div>
       <div className="row"><button className="btn" onClick={() => { navigator.clipboard?.writeText(`${r.report.subject}\n\n${body}`).catch(() => {}); toast(H ? "शिकायत कॉपी हुई" : "Complaint copied"); }}><Icon n="copy" s={16} />{H ? "शिकायत कॉपी करें" : "Copy complaint"}</button>{!sent && <Share id={r.id} text={shareText} />}</div></section>}
+    <Authorities r={r} H={H} />
     <details className="card"><summary><b>{t("details")}</b></summary>
       <div className="stack gap-4" style={{ marginTop: "var(--s3)" }}>
         <div className="grid">{r.potholes.map((p: any) => <div className="card sm stack gap-2" key={p.id}>

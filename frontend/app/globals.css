@@ -1,5 +1,5 @@
 /* Hallmark v2.0.0 redesign (landing): custom direction under owner rules (light clay, glass inputs, no gradient, no glow). Signature: the live SAM 3.1 ride overlay. Waivers: content-without-JS (Framer reveals). */
-/* Gaadi Guru design system v4 — light clay + glass. Rules: no gradients, no glows; 8px spacing grid; one type scale.
+/* Patchwise design system v4 — light clay + glass. Rules: no gradients, no glows; 8px spacing grid; one type scale.
    Tokens → primitives (btn, input, card, badge, tabs, toast, modal, skeleton) → page layouts. */
 :root { --white: #fdfdfe;
   --bg: #eef0f3; --surface: #f7f8fa; --surface-2: #e9ecf0; --ink: #1c2230; --ink-2: #566072; --ink-3: #8790a0;
@@ -68,7 +68,7 @@ a.card { transition: transform .2s var(--ease); } a.card:hover { transform: tran
 .btn.lg { min-height: 52px; padding: 0 var(--s4); font-size: var(--t-md); border-radius: var(--r-md); }
 .btn.xl { min-height: 56px; padding: 0 var(--s5); font-size: var(--t-lg); border-radius: var(--r-md); align-self: flex-start; }
 .btn.block { width: 100%; align-self: stretch; }
-.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn:disabled, .btn[aria-disabled=true] { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
 .btn.primary:disabled { background: var(--c6); }
 /* inputs */
 .field { display: flex; flex-direction: column; gap: var(--s1); font-size: var(--t-sm); font-weight: 600; color: var(--ink-2); }
@@ -292,3 +292,15 @@ details[open] > summary:after { transform: rotate(-135deg); }
 .hm-plist li { display: flex; gap: 20px; align-items: flex-start; } .hm-plist p { margin-top: 4px; }
 @media (max-width: 900px) { .hm-hero, .hm-problem, .hm-privacy { grid-template-columns: minmax(0, 1fr); gap: 32px; min-height: 0; padding-top: 16px; } .hm-nums { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .hm-hero .l-h1 { font-size: clamp(40px, 4.6vw, 62px); }
+/* Patchwise v5 additions: account chip, authority cards, portal format list. Same tokens; no gradients, no glow. */
+a.lang { display: inline-flex; align-items: center; text-decoration: none; }
+@media (max-width: 520px) { .acct-l { display: none; } }
+.auth-card .contact { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); flex-wrap: wrap; min-height: 44px; }
+.src { font-size: var(--t-xs); color: var(--ink-3); word-break: break-all; }
+.pf { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s2); }
+.pf li { display: grid; grid-template-columns: 28px 1fr auto; gap: var(--s2); align-items: center; padding: var(--s2) var(--s3); }
+.pf .n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: var(--t-xs); font-weight: 700; background: var(--white); box-shadow: var(--clay-sm); }
+.pf .v { font-size: var(--t-sm); color: var(--ink-2); word-break: break-word; }
+.opts { display: flex; flex-direction: column; gap: var(--s1); }
+.opt { display: flex; gap: var(--s2); align-items: flex-start; padding: var(--s2) var(--s3); border-radius: var(--r-sm); cursor: pointer; min-height: 44px; }
+.opt input { margin-top: 4px; }

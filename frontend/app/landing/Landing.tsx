@@ -65,7 +65,7 @@ function Hero() {
     <div className="hm-hero-copy">
       <Lines now as="h1" className="l-h1" delay={0.05} lines={L("Every bad road,|reported in one tap.", "हर खराब सड़क,|एक टैप में रिपोर्ट।").split("|")} />
       <motion.p className="l-lead" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease, delay: 0.35 }}>
-        {L("Record your ride. Gaadi Guru finds each pothole, prices the fix and fills the city complaint for you to send.",
+        {L("Record your ride. Patchwise finds each pothole, prices the fix and fills the city complaint for you to send.",
            "राइड रिकॉर्ड करें। गाड़ी गुरु हर गड्ढा ढूंढता है, मरम्मत का खर्च निकालता है और शिकायत भरता है, भेजना आपके हाथ में।")}</motion.p>
       <motion.div className="row" style={{ gap: 20 }} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease, delay: 0.45 }}>
         <Magnetic><Link href="/new" className="btn primary xl cta">{L("Report a road", "सड़क रिपोर्ट करें")}<Icon n="arrow" s={18} /></Link></Magnetic>

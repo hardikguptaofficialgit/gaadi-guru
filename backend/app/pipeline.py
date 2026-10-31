@@ -1,4 +1,4 @@
-"""Gaadi Guru pipeline: video -> Spark plan -> SAM 3.1 tracking -> dedup -> severity -> privacy blur -> report."""
+"""Patchwise pipeline: video -> Spark plan -> SAM 3.1 tracking -> dedup -> severity -> privacy blur -> report."""
 from __future__ import annotations
 import json, math, re, subprocess, tempfile, uuid
 from collections import defaultdict
@@ -441,7 +441,7 @@ def render_overlay(out: Path, vid: Path, potholes: list[dict], privacy: dict, fp
             cv2.putText(f, f"#{ph['id']} {ph['severity']}", (x1, max(18, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, col, 2)
         f = cv2.addWeighted(layer, 0.35, f, 0.65, 0)
         cv2.rectangle(f, (0, 0), (W, 34), (20, 20, 20), -1)
-        cv2.putText(f, f"GAADI GURU  |  SAM 3.1  |  potholes: {len(seen)}", (10, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (3, 183, 255), 2)
+        cv2.putText(f, f"PATCHWISE  |  SAM 3.1  |  potholes: {len(seen)}", (10, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (3, 183, 255), 2)
         vw.write(f); i += 1
     cap.release(); vw.release()
     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(raw), "-c:v", "libx264", "-pix_fmt", "yuv420p",

@@ -163,9 +163,10 @@ def test_frame_jpeg(client, rids):
 
 
 def test_geo_reverse_cached(client, monkeypatch):
-    from app import main
-    main._GEO[(1.0, 2.0)] = {"locality": "X"}
+    from app import routing, pipeline
+    pipeline.write_json(pipeline.DATA / "geocache.json", {"1.0000,2.0000": {"suburb": "X", "source": routing.OSM_CREDIT}})
     assert client.get("/geo/reverse", params={"lat": 1, "lng": 2}).json()["locality"] == "X"
+    assert "error" in client.get("/geo/reverse", params={"lat": 3, "lng": 4}).json()  # offline: graceful
 
 
 def test_wards_stats(client, rids):

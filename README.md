@@ -1,4 +1,4 @@
-# 🛵 Gaadi Guru — Ride. Record. Report.
+# 🛵 Patchwise — Ride. Record. Report.
 
 **Turn a phone video of any Indian road into a measured, privacy-blurred, geotagged pothole complaint in about a minute.** It's powered by Meta **SAM 3.1** video segmentation, **Muse Spark** and **Muse Voice Transcribe**.
 
@@ -128,3 +128,8 @@ MIT
 - Success screen: WhatsApp / X / copy-link share, 7-day reminder; **My reports** lists reminders.
 - **City map** has tabs: Map · Repairs board · Ward ranking. Technical details (SAM masks, COCO export, agent timeline) are folded away.
 - New API: `GET /nearby`, `POST /reports/{id}/upvote`, `GET /followups`; `/analyze` accepts images.
+
+## Accounts and authorities
+
+- **Accounts (optional):** Supabase email magic link. Copy `frontend/.env.example` to `frontend/.env.local`. Then run `supabase/schema.sql` once in the Supabase SQL editor. Reports are stored per user with RLS. The public map and reports work without login. If Supabase is unreachable, the app falls back to the on-device list.
+- **Authorities:** `backend/app/authorities/authorities.json`. The city comes from OpenStreetMap Nominatim, at most 1 request per second, cached, and attributed. Users can override the city. "Send to authorities" opens a prefilled email in English and Hindi. It only uses emails with medium or high confidence; otherwise it points to the portal and helpline. Portal format cards give a copy button for each field.

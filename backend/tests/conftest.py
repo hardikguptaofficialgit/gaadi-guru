@@ -11,6 +11,7 @@ for p in SRC.iterdir():
 for n in ("followups.json",):
     if (SRC / n).exists(): shutil.copy(SRC / n, TMP / n)
 os.environ["GG_DATA"] = str(TMP)
+os.environ["GG_OFFLINE_GEO"] = "1"  # never hit Nominatim from tests
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app import meta, costs  # noqa: E402
