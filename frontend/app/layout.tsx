@@ -1,15 +1,15 @@
 import "./globals.css";
 import "leaflet/dist/leaflet.css";
-import { Instrument_Sans, Instrument_Serif, JetBrains_Mono } from "next/font/google";
+import { Gloock, Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import Nav from "./Nav";
 import Spend from "./Spend";
 import { Brand } from "./Icon";
 import { LangProvider } from "./i18n";
 import { ToastProvider } from "./ui";
 import { AuthProvider } from "./auth";
-const sans = Instrument_Sans({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
-const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-serif", display: "swap" });
-const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
+const sans = Hanken_Grotesk({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-inter", display: "swap" });
+const serif = Gloock({ subsets: ["latin"], weight: "400", variable: "--font-serif", display: "swap" });
+const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-mono", display: "swap" });
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 export const metadata = { icons: { icon: [{ url: "/icon.svg", type: "image/svg+xml" }, { url: "/brand/favicon.ico", sizes: "48x48" }], apple: "/brand/apple-touch-icon.png" }, manifest: "/manifest.webmanifest", metadataBase: new URL(SITE), title: "Patchwise: report a bad road in one tap", description: "Meta SAM 3.1 + Muse Spark + Muse Wonder civic agent",
   openGraph: { title: "Patchwise", description: "Report a bad road in one tap. Faces and plates blurred." } };

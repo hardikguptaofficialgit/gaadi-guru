@@ -86,46 +86,53 @@ function Send() {
   </section>;
 }
 
-/** r6 hero: asymmetric. Headline + one action on the left; the real product (a live report ticket) on the right. */
-function Ticket() {
-  const f = useContext(S)?.featured; const L = useL(); const [r, setR] = useState<any>(null); const [rt, setRt] = useState<any>(null);
-  useEffect(() => { if (!f?.id) return; get(`/reports/${f.id}`).then(setR).catch(() => {}); get(`/reports/${f.id}/route`).then(setRt).catch(() => {}); }, [f?.id]);
-  const auth = rt?.authorities?.[0]; const lines = (r?.report?.body_en || "").split("\n").filter(Boolean);
-  return <motion.article className="tk" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease, delay: 0.2 }} aria-label={L("A real Patchwise report", "एक असली Patchwise रिपोर्ट")}>
-    <header className="tk-h"><span className="mono-t">PW-{f?.id || "··········"}</span><span className="tk-st"><i />{r ? ({ reported: L("Reported", "रिपोर्ट"), filed: L("Filed", "दर्ज"), promised: L("Awaiting repair", "मरम्मत बाकी"), fixed: L("Fixed", "ठीक") } as any)[r.status] || r.status : "…"}</span></header>
-    <div className="tk-media">{f?.overlay ? <video src={API + f.overlay} autoPlay muted loop playsInline aria-label={L("Pothole masks drawn by SAM 3.1 on a real ride", "असली राइड पर SAM 3.1 के गड्ढा निशान")} /> : <div className="hm-empty" />}
-      <span className="tk-tag mono-t">SAM 3.1 · {L("frame", "फ्रेम")} {f?.best_frame ?? "—"}</span></div>
-    <dl className="tk-meta">
-      <div><dt>{L("Where", "जगह")}</dt><dd>{f?.ward || "—"}{r && <span className="mono-t mut"> {r.lat?.toFixed(3)}, {r.lng?.toFixed(3)}</span>}</dd></div>
-      <div><dt>{L("Found", "मिले")}</dt><dd><b className="mono-t">{f?.count ?? "—"}</b> {L("potholes", "गड्ढे")}, {f?.dangerous ?? 0} {L("dangerous", "खतरनाक")}; {L("largest", "सबसे बड़ा")} <span className="mono-t">{f?.top_m2 ?? "—"} m²</span></dd></div>
-      <div><dt>{L("Fix, est.", "खर्च, अनुमान")}</dt><dd className="mono-t">{f ? inr(f.inr) : "—"}</dd></div>
-      <div><dt>{L("Routed to", "भेजा गया")}</dt><dd>{auth?.authority || "—"}</dd></div>
-      <div><dt>{L("Re-check", "फिर जांच")}</dt><dd className="mono-t">{f?.followup_due || "—"}</dd></div>
-    </dl>
-    {r?.report?.subject && <div className="tk-letter"><b>{r.report.subject}</b><p>{lines.slice(1, 2).join(" ").slice(0, 210)}{lines.length > 2 ? "…" : ""}</p></div>}
-    <footer className="tk-f"><span>{L("Faces and plates blurred", "चेहरे व प्लेट धुंधले")}</span>{f && <Link href={`/report?id=${f.id}`} className="tk-open">{L("Open this report", "यह रिपोर्ट खोलें")}<Icon n="arrow" s={14} /></Link>}</footer>
-  </motion.article>;
+/** r7 hero: server-rendered example report (ISR 60s). Poster still paints first; the video only loads on hover, tap or idle. */
+const STATUS: Record<string, [string, string]> = { reported: ["Reported", "रिपोर्ट"], filed: ["Filed", "दर्ज"], promised: ["Awaiting repair", "मरम्मत बाकी"], fixed: ["Fixed", "ठीक"] };
+function Ticket({ f }: { f: any }) {
+  const L = useL(); const [vid, setVid] = useState(false); const reduce = useReducedMotion();
+  useEffect(() => { if (!f?.overlay || reduce) return; const w = window as any;
+    const id = w.requestIdleCallback ? w.requestIdleCallback(() => setVid(true), { timeout: 4000 }) : setTimeout(() => setVid(true), 2500);
+    return () => (w.cancelIdleCallback ? w.cancelIdleCallback(id) : clearTimeout(id)); }, [f?.overlay, reduce]);
+  const sk = !f; const d = (x: any) => sk ? <span className="sk-line" /> : x;
+  return <div className="tk-wrap reveal" style={{ animationDelay: ".08s" }}>
+    <div className="tk-label"><span className="eyebrow">{L("Example report", "उदाहरण रिपोर्ट")}</span><span>{L("What you get from a 30-second road video", "30 सेकंड के सड़क वीडियो से आपको क्या मिलता है")}</span></div>
+    <article className={"tk" + (sk ? " is-sk" : "")} aria-busy={sk} aria-label={L("Example Patchwise report", "Patchwise उदाहरण रिपोर्ट")}>
+      <header className="tk-h"><span className="mono-t">{sk ? "PW-··········" : `PW-${f.id}`}</span><span className="tk-st"><i />{sk ? "…" : (STATUS[f.status]?.[L("0", "1") === "0" ? 0 : 1] ?? f.status)}</span></header>
+      <div className="tk-media" onMouseEnter={() => setVid(true)} onClick={() => setVid(true)}>
+        {f?.poster && <img src={API + f.poster} width={640} height={360} alt={L("Pothole masks drawn by SAM 3.1 on a real ride", "असली राइड पर SAM 3.1 के गड्ढा निशान")} fetchPriority="high" decoding="async" />}
+        {vid && f?.overlay && <video src={API + f.overlay} poster={f.poster ? API + f.poster : undefined} preload="none" autoPlay muted loop playsInline aria-hidden />}
+        {!sk && <span className="tk-tag mono-t">SAM 3.1 · {L("frame", "फ्रेम")} {f.best_frame ?? "—"}</span>}
+      </div>
+      <dl className="tk-meta">
+        <div><dt>{L("Where", "जगह")}</dt><dd>{d(<>{f?.ward || "—"}<span className="mono-t mut"> {f?.lat?.toFixed(3)}, {f?.lng?.toFixed(3)}</span></>)}</dd></div>
+        <div><dt>{L("Found", "मिले")}</dt><dd>{d(<><b className="mono-t">{f?.count}</b> {L("potholes", "गड्ढे")}, {f?.dangerous} {L("dangerous", "खतरनाक")}; {L("largest", "सबसे बड़ा")} <span className="mono-t">{f?.top_m2} m²</span></>)}</dd></div>
+        <div><dt>{L("Fix, est.", "खर्च, अनुमान")}</dt><dd className="mono-t">{d(inr(f?.inr))}</dd></div>
+        <div><dt>{L("Routed to", "भेजा गया")}</dt><dd>{d(f?.authority || "—")}</dd></div>
+        <div><dt>{L("Re-check", "फिर जांच")}</dt><dd className="mono-t">{d(f?.followup_due || "—")}</dd></div>
+      </dl>
+      <div className="tk-letter"><b>{d(f?.subject)}</b><p>{d(f?.excerpt)}</p></div>
+      <footer className="tk-f"><span>{L("Faces and plates blurred", "चेहरे व प्लेट धुंधले")}</span>{f && <Link href={`/report?id=${f.id}`} className="tk-open">{L("Open this report", "यह रिपोर्ट खोलें")}<Icon n="arrow" s={14} /></Link>}</footer>
+    </article></div>;
 }
 
-function Hero() {
+function Hero({ f }: { f: any }) {
   const L = useL(); const s = useContext(S);
   return <section className="hx">
     <div className="hx-copy">
-      <p className="hx-kicker mono-t">{L("Bhubaneswar · Delhi · Kolkata · NYC · SF and 20 more cities", "भुवनेश्वर · दिल्ली · कोलकाता · NYC · SF और 20 शहर")}</p>
-      <Lines now as="h1" className="hx-h1" delay={0.05} lines={L("Every bad road|has an owner. *We find them.*", "हर खराब सड़क|का एक मालिक है। *हम ढूंढते हैं।*").split("|")} />
-      <motion.p className="hx-lead" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease, delay: 0.3 }}>
-        {L("Film thirty seconds of the road from your scooter. Patchwise marks every pothole, prices the patch at municipal rates, and writes the complaint to the ward office or 311 desk that is actually responsible — in English and Hindi.",
-           "स्कूटर से सड़क के तीस सेकंड रिकॉर्ड करें। Patchwise हर गड्ढा चिह्नित करता है, नगर निगम दर से खर्च निकालता है, और उसी वार्ड दफ़्तर या 311 डेस्क को शिकायत लिखता है जो ज़िम्मेदार है।")}</motion.p>
-      <motion.div className="hx-act" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease, delay: 0.4 }}>
-        <Magnetic k={0.15}><Link href="/new" className="btn primary lg cta">{L("Report a road", "सड़क रिपोर्ट करें")}<Icon n="arrow" s={16} /></Link></Magnetic>
+      <p className="hx-kicker eyebrow reveal">{L("Bhubaneswar · Delhi · Kolkata · NYC · SF and 20 more cities", "भुवनेश्वर · दिल्ली · कोलकाता · NYC · SF और 20 शहर")}</p>
+      <h1 className="hx-h1 reveal">{L("Every bad road has an owner.", "हर खराब सड़क का एक मालिक है।")} <span className="hx-sub">{L("We find them.", "हम ढूंढते हैं।")}</span></h1>
+      <p className="hx-lead reveal" style={{ animationDelay: ".05s" }}>{L("Film thirty seconds of the road from your scooter. Patchwise marks every pothole, prices the patch at municipal rates, and writes the complaint to the ward office or 311 desk that is actually responsible, in English and Hindi.",
+           "स्कूटर से सड़क के तीस सेकंड रिकॉर्ड करें। Patchwise हर गड्ढा चिह्नित करता है, नगर निगम दर से खर्च निकालता है, और उसी वार्ड दफ़्तर या 311 डेस्क को शिकायत लिखता है जो ज़िम्मेदार है।")}</p>
+      <div className="hx-act reveal" style={{ animationDelay: ".1s" }}>
+        <Link href="/new" className="btn primary lg cta">{L("Report a road", "सड़क रिपोर्ट करें")}<Icon n="arrow" s={16} /></Link>
         <a href="#record" className="l-link">{L("How detection works", "पहचान कैसे होती है")}</a>
-      </motion.div>
-      {s && <motion.dl className="hx-nums" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.55 }}>
-        <div><dt>{L("Potholes mapped", "दर्ज गड्ढे")}</dt><dd className="mono-t">{n(s.hazards)}</dd></div>
-        <div><dt>{L("Repair backlog", "मरम्मत बकाया")}</dt><dd className="mono-t">{inr(s.inr_total)}</dd></div>
-        <div><dt>{L("Complaints filled", "शिकायतें भरी")}</dt><dd className="mono-t">{s.filed}/{s.reports}</dd></div></motion.dl>}
+      </div>
+      <dl className="hx-nums reveal" style={{ animationDelay: ".15s" }}>
+        <div><dt>{L("Potholes mapped", "दर्ज गड्ढे")}</dt><dd className="mono-t">{s ? n(s.hazards) : "—"}</dd></div>
+        <div><dt>{L("Repair backlog", "मरम्मत बकाया")}</dt><dd className="mono-t">{s ? inr(s.inr_total) : "—"}</dd></div>
+        <div><dt>{L("Complaints filled", "शिकायतें भरी")}</dt><dd className="mono-t">{s ? `${s.filed}/${s.reports}` : "—"}</dd></div></dl>
     </div>
-    <Ticket />
+    <Ticket f={f} />
   </section>;
 }
 
@@ -246,10 +253,10 @@ function CTA() {
   </section>;
 }
 
-export default function Landing() {
+export default function Landing({ featured = null }: { featured?: any }) {
   const [s, setS] = useState<any>(null);
   useEffect(() => { get("/stats").then(setS).catch(() => {}); }, []);
   useEffect(() => { if (s) requestAnimationFrame(() => ScrollTrigger.refresh()); }, [s]);
   return <MotionConfig reducedMotion="user"><S.Provider value={s}><Smooth />
-    <main className="wrap landing"><Hero /><Problem /><Compare /><Send /><Agent /><Impact /><Privacy /><CTA /></main></S.Provider></MotionConfig>;
+    <main className="wrap landing"><Hero f={featured} /><Problem /><Compare /><Send /><Agent /><Impact /><Privacy /><CTA /></main></S.Provider></MotionConfig>;
 }

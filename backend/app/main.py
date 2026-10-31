@@ -368,6 +368,71 @@ def wards():
     return sorted({r.get("ward") for r in agent.all_reports() if r.get("ward")})
 
 
+_FEAT: dict = {"key": None, "val": None}
+_POSTER_BUSY: set = set()
+
+
+def _poster(rid: str, overlay: str | None, frame: int) -> str | None:
+    """Small WebP still (640x360) of the SAM overlay at the best frame; cached next to the report."""
+    out = pipeline.DATA / rid / "poster.webp"
+    if out.exists() and out.stat().st_size:
+        return f"/media/{rid}/poster.webp"
+    if not overlay:
+        return None
+    if rid in _POSTER_BUSY:
+        return None
+    _POSTER_BUSY.add(rid)
+    threading.Thread(target=_make_poster, args=(rid, overlay, frame), daemon=True).start()
+    return None  # generated in the background; never block the hero request on ffmpeg
+
+
+def _make_poster(rid: str, overlay: str, frame: int) -> None:
+    out = pipeline.DATA / rid / "poster.webp"
+    src = pipeline.DATA / overlay.removeprefix("/media/")
+    if not src.exists():
+        return None
+    import subprocess
+    for sel in ([ "-vf", f"select=eq(n\\,{int(frame or 0)}),scale=640:360:force_original_aspect_ratio=increase,crop=640:360"],
+                ["-vf", "scale=640:360:force_original_aspect_ratio=increase,crop=640:360"]):
+        try:
+            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), *sel, "-frames:v", "1", "-quality", "72", str(out)], timeout=120, check=True)
+            if out.exists() and out.stat().st_size:
+                _FEAT["key"] = None
+                return
+        except Exception:
+            pass
+    out.unlink(missing_ok=True)
+
+
+@app.get("/featured")
+def featured():
+    """Compact, cached 'example report' for the landing hero: one request, no video, poster still included."""
+    rs = agent.all_reports()
+    feat = max(rs, key=lambda r: (len(r["potholes"]), (pipeline.DATA / r["id"] / "agent.jsonl").exists()), default=None)
+    if not feat:
+        return {"featured": None}
+    key = (feat["id"], feat.get("status"), feat.get("followup_due"), len(feat["potholes"]))
+    if _FEAT["key"] == key:
+        return _FEAT["val"]
+    ph = feat["potholes"]; rep = feat.get("report") or {}
+    try:
+        auth = (routing.route(feat, city=feat.get("city_pick")).get("authorities") or [{}])[0].get("authority")
+    except Exception:
+        auth = None
+    lines = [l for l in (rep.get("body_en") or "").split("\n") if l.strip()]
+    val = {"featured": {"id": feat["id"], "ward": feat.get("ward"), "status": feat.get("status"),
+           "lat": feat.get("lat"), "lng": feat.get("lng"), "count": len(ph),
+           "dangerous": sum(p["severity"] == "CRITICAL" for p in ph),
+           "inr": sum((p.get("repair") or pipeline.repair_estimate(p))["inr_est"] for p in ph),
+           "top_m2": max(((p.get("repair") or {}).get("area_m2_est", 0) for p in ph), default=0),
+           "best_frame": ph[0]["best_frame"] if ph else 0, "overlay": feat.get("overlay"),
+           "poster": _poster(feat["id"], feat.get("overlay"), ph[0]["best_frame"] if ph else 0),
+           "authority": auth, "followup_due": feat.get("followup_due"),
+           "subject": rep.get("subject"), "excerpt": (lines[1] if len(lines) > 1 else "")[:210]}}
+    _FEAT.update(key=key, val=val)
+    return val
+
+
 @app.get("/stats")
 def stats():
     """Everything the landing page shows, computed from real reports + the spend log."""

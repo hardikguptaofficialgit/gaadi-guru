@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { API, get } from "../api";
 import { useT, Stepper, mine } from "../i18n";
+import VoiceNote from "./VoiceNote";
 import Icon from "../Icon";
 import Where, { Loc } from "./Where";
 const ORDER = ["prepare", "plan", "scan", "upload", "sam", "privacy", "render", "write"];
@@ -52,9 +53,7 @@ export default function New() {
           <span className={"ico-tile" + (file ? " ok" : "")}><Icon n={file ? (isPhoto ? "camera" : "video") : "upload"} /></span>
           <b>{file ? file.name : (H ? "टैप करें या फ़ाइल यहां छोड़ें" : "Tap to choose, or drop a file here")}</b>
           <span className="tiny">{file ? `${(file.size / 1e6).toFixed(1)} MB` : t("upHint")}</span></span></label>
-      <label className="field">{t("voice")}
-        <span className={"drop sm" + (voice ? " has" : "")}><input type="file" accept="audio/*" aria-label={t("voice")} onChange={e => setVoice(e.target.files?.[0] || null)} />
-          <span className={"ico-tile" + (voice ? " ok" : "")}><Icon n="mic" /></span><b>{voice ? voice.name : t("voiceHint")}</b></span></label>
+      <div className="field"><span>{t("voice")}</span><VoiceNote value={voice} onChange={setVoice} H={lang === "hi"} /></div>
       <Where H={H} onChange={setLoc} />
       <label className="field">{t("ward")}<input value={ward} list="wards" placeholder={H ? "वार्ड / इलाका" : "Ward / locality"} onChange={e => setWard(e.target.value)} data-testid="ward-input" />
         <datalist id="wards">{wards.map(w => <option key={w} value={w} />)}</datalist></label>
