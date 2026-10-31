@@ -1,7 +1,8 @@
 # Patchwise Task r8 Completion Report
 
 ## 1. Commit Information
-- **Commit Hash:** `15a895b740ba0bda828f172a19ac3e3f40adb921` (short: `15a895b`)
+- **Implementation Commit:** `15a895b740ba0bda828f172a19ac3e3f40adb921` (short: `15a895b`)
+- **Report Commit:** `5741f33`
 - **Branch:** `main`
 - **Remote:** `origin/main` (pushed cleanly without force-push)
 
