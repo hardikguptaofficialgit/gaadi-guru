@@ -3,6 +3,7 @@ import "leaflet/dist/leaflet.css";
 import { Inter } from "next/font/google";
 import Nav from "./Nav";
 import Spend from "./Spend";
+import { Brand } from "./Icon";
 import { LangProvider } from "./i18n";
 import { ToastProvider } from "./ui";
 import { AuthProvider } from "./auth";
@@ -13,5 +14,5 @@ export const metadata = { metadataBase: new URL(SITE), title: "Patchwise: report
 export const viewport = { width: "device-width", initialScale: 1 };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return <html lang="en" className={inter.variable}><body><LangProvider><AuthProvider><ToastProvider><Nav />{children}
-    <footer className="wrap"><div className="foot tiny"><span>Patchwise · Faces and number plates are blurred before anything is stored or shared.</span><Spend /></div></footer></ToastProvider></AuthProvider></LangProvider></body></html>;
+    <footer className="wrap"><div className="foot tiny"><span>Patchwise · Faces and number plates are blurred before anything is stored or shared.</span><span className="row gap-2"><span className="row gap-1">Powered by <Brand b="meta" s={12} label="Meta" /> Meta</span><Spend /></span></div></footer></ToastProvider></AuthProvider></LangProvider></body></html>;
 }

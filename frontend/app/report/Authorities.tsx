@@ -3,7 +3,7 @@
 // verified contacts with source + confidence, a mailto draft, and the portal's own field order.
 import { useEffect, useState } from "react";
 import { API } from "../api";
-import Icon from "../Icon";
+import Icon, { Brand } from "../Icon";
 import { useToast } from "../ui";
 import { useAuth, toRow } from "../auth";
 
@@ -85,7 +85,7 @@ export default function Authorities({ r, H }: { r: any; H: boolean }) {
       <select value={o.city || ""} onChange={e => { setCity(e.target.value); setPick(""); }} data-testid="city">
         <option value="">{H ? "चुनें…" : "Choose…"}</option>{o.cities.map((c: string) => <option key={c} value={c}>{c}</option>)}</select>
       <span className="hint">{o.detected_city ? (H ? `जगह से पता चला: ${o.detected_city}` : `Detected from the location: ${o.detected_city}`) + (o.overridden ? (H ? " (आपने बदला)" : " (you changed it)") : "")
-        : (H ? "जगह से शहर पता नहीं चला" : "Couldn't tell the city from the location")}{o.osm_credit ? ` · ${o.osm_credit}` : ""}</span></label>
+        : (H ? "जगह से शहर पता नहीं चला" : "Couldn't tell the city from the location")}{o.osm_credit ? <> · <Brand b="openstreetmap" s={12} /> {o.osm_credit}</> : ""}</span></label>
     {d && (!d.decided || pick) && <fieldset className="stack gap-2" style={{ border: 0, padding: 0, margin: 0 }} data-testid="delhi-choice">
       <legend className="small"><b>{H ? "दिल्ली में सड़क किसकी है?" : "Which body owns this Delhi road?"}</b></legend>
       <span className="tiny">{d.reason}</span>

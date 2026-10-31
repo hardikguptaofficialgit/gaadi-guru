@@ -3,7 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useAuth, GOOGLE } from "../auth";
 import { useT, mine } from "../i18n";
-import Icon from "../Icon";
+import Icon, { Brand } from "../Icon";
 
 export default function Login() {
   const { lang } = useT(); const H = lang === "hi"; const T = (en: string, hi: string) => H ? hi : en;
@@ -23,8 +23,8 @@ export default function Login() {
         <button className="btn ghost" onClick={() => setSent(false)}>{T("Use another email", "दूसरा ईमेल")}</button></div>
     : <form className="card stack gap-3" onSubmit={go} data-testid="login-form">
         <label className="field">{T("Email", "ईमेल")}<input type="email" required value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" inputMode="email" placeholder="you@example.com" /></label>
-        <button className="btn primary lg block" disabled={busy || !email} data-testid="magic-link">{busy ? T("Sending…", "भेज रहे हैं…") : T("Email me a sign-in link", "साइन-इन लिंक भेजें")}</button>
-        {GOOGLE && <button type="button" className="btn lg block" onClick={async () => { const x = await a.google(); if (x) setErr(x); }}>{T("Continue with Google", "Google से जारी रखें")}</button>}
+        <button className="btn primary lg block" disabled={busy || !email} data-testid="magic-link"><Icon n="mail" s={18} />{busy ? T("Sending…", "भेज रहे हैं…") : T("Email me a sign-in link", "साइन-इन लिंक भेजें")}</button>
+        {GOOGLE && <button type="button" className="btn lg block" onClick={async () => { const x = await a.google(); if (x) setErr(x); }}><Brand b="google" s={18} />{T("Continue with Google", "Google से जारी रखें")}</button>}
         {local > 0 && <span className="tiny">{T(`After you sign in you can add the ${local} report${local > 1 ? "s" : ""} from this phone to your account.`, `साइन इन के बाद इस फ़ोन की ${local} रिपोर्ट अपने अकाउंट में जोड़ सकते हैं।`)}</span>}
         {(err || a.down) && <p role="alert" className="small" style={{ color: "var(--crit)" }}>{err || T("Can't reach the account server right now. Reporting still works.", "अभी अकाउंट सर्वर से संपर्क नहीं हो रहा। रिपोर्ट करना चालू है।")}</p>}
       </form>}

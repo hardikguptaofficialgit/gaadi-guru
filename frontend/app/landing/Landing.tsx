@@ -10,6 +10,7 @@ import { API, get, inr } from "../api";
 import { useT } from "../i18n";
 import Smooth from "./Smooth";
 import Icon from "./Icon";
+import { Brand } from "../Icon";
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 const HotMap = dynamic(() => import("../HotMap"), { ssr: false });
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -58,6 +59,43 @@ function detail(tool: string, r: any, L: (a: string, b: string) => string) {
   }
 }
 
+function Idx({ i, t }: { i: string; t: string }) { return <div className="l-idx"><span className="num">{i}</span><span>{t}</span></div>; }
+
+/** Three-column value strip under the hero, ruled by hairlines. */
+function Strip() {
+  const L = useL();
+  const V: [string, string, string, string][] = [["scan", "01", L("Detect", "पहचान"), L("SAM 3.1 outlines every pothole in your ride and rates how bad it is.", "SAM 3.1 राइड में हर गड्ढे का निशान और गंभीरता बताता है।")],
+    ["gov", "02", L("Route", "सही विभाग"), L("Finds the body that owns the road, with the source for every contact.", "सड़क किस विभाग की है, हर संपर्क के स्रोत के साथ।")],
+    ["mail", "03", L("Send", "भेजें"), L("A ready email in English and Hindi, or the portal form field by field.", "अंग्रेज़ी-हिंदी में तैयार ईमेल, या पोर्टल फ़ॉर्म फ़ील्ड-दर-फ़ील्ड।")]];
+  return <motion.ol className="l-strip" variants={stagger} {...inView}>{V.map(([ic, i, t, d]) => <motion.li key={i} variants={up}>
+    <div className="row between"><Icon n={ic} s={20} /><span className="tiny num">{i}</span></div><h3>{t}</h3><p className="mut small">{d}</p></motion.li>)}</motion.ol>;
+}
+
+/** Send to the right authority: real coverage from /authorities. */
+function Send() {
+  const L = useL(); const [d, setD] = useState<any>(null);
+  useEffect(() => { get("/authorities").then(setD).catch(() => {}); }, []);
+  const a: any[] = d?.authorities || []; const cities = (cc: string) => Array.from(new Set(a.filter(x => x.country === cc && x.city).map(x => x.city))).sort();
+  const IN = cities("IN"), US = cities("US");
+  const withMail = a.filter(x => (x.emails || []).length).length, withPf = a.filter(x => x.has_portal_format).length;
+  return <section className="l-sec" id="send">
+    <Idx i="03" t={L("Send", "भेजें")} />
+    <div className="l-two">
+      <div className="l-head"><Lines lines={L("Sent to the office|that owns the road.", "उसी दफ़्तर तक|जिसकी सड़क है।").split("|")} className="l-h2" />
+        <motion.p variants={up} {...inView} className="l-sub">{L("Patchwise picks the authority from the location, and you can change the city. Then one tap opens a ready email in English and Hindi, or a copy-ready list of the portal's fields in order. Every contact shows its source and how sure we are.",
+          "Patchwise जगह से विभाग चुनता है, शहर आप बदल सकते हैं। फिर एक टैप में अंग्रेज़ी-हिंदी ईमेल, या पोर्टल के फ़ील्ड क्रम से कॉपी के लिए। हर संपर्क का स्रोत और भरोसा दिखता है।")}</motion.p></div>
+      <motion.dl className="l-table" variants={stagger} {...inView}>
+        {d ? <>
+          <motion.div variants={up}><dt>{L("India", "भारत")} <span className="tiny num">{IN.length}</span></dt><dd>{IN.join(" · ")}</dd></motion.div>
+          <motion.div variants={up}><dt>{L("United States", "अमेरिका")} <span className="tiny num">{US.length}</span></dt><dd>{US.join(" · ")}</dd></motion.div>
+          <motion.div variants={up}><dt><Icon n="mail" s={16} /> {L("Email", "ईमेल")}</dt><dd>{L(`${withMail} authorities with a checked complaint email; the rest get the portal and helpline instead.`, `${withMail} विभागों के जांचे हुए ईमेल; बाकी के लिए पोर्टल और हेल्पलाइन।`)}</dd></motion.div>
+          <motion.div variants={up}><dt><Icon n="form" s={16} /> {L("Portal format", "पोर्टल फ़ॉर्म")}</dt><dd>{L(`${withPf} portals mapped field by field, each with a copy button.`, `${withPf} पोर्टल फ़ील्ड-दर-फ़ील्ड, हर एक पर कॉपी बटन।`)}</dd></motion.div>
+        </> : <motion.div variants={up}><dt>{L("Coverage", "कवरेज")}</dt><dd className="mut">{L("Loading the authority list", "सूची लोड हो रही है")}</dd></motion.div>}
+      </motion.dl>
+    </div>
+  </section>;
+}
+
 /* Hallmark redesign: one idea per screen, no eyebrows, no feature grid, page ends on its one action. */
 function Hero() {
   const s = useContext(S); const f = s?.featured; const L = useL();
@@ -65,12 +103,15 @@ function Hero() {
     <div className="hm-hero-copy">
       <Lines now as="h1" className="l-h1" delay={0.05} lines={L("Every bad road,|reported in one tap.", "हर खराब सड़क,|एक टैप में रिपोर्ट।").split("|")} />
       <motion.p className="l-lead" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease, delay: 0.35 }}>
-        {L("Record your ride. Patchwise finds each pothole, prices the fix and fills the city complaint for you to send.",
-           "राइड रिकॉर्ड करें। गाड़ी गुरु हर गड्ढा ढूंढता है, मरम्मत का खर्च निकालता है और शिकायत भरता है, भेजना आपके हाथ में।")}</motion.p>
+        {L("Record your ride. Patchwise finds each pothole, prices the fix and routes the complaint to the authority that owns the road.",
+           "राइड रिकॉर्ड करें। Patchwise हर गड्ढा ढूंढता है, मरम्मत का खर्च निकालता है और शिकायत सही विभाग तक पहुंचाता है।")}</motion.p>
       <motion.div className="row" style={{ gap: 20 }} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease, delay: 0.45 }}>
         <Magnetic><Link href="/new" className="btn primary xl cta">{L("Report a road", "सड़क रिपोर्ट करें")}<Icon n="arrow" s={18} /></Link></Magnetic>
         <a href="#record" className="l-link">{L("See a real report", "असली रिपोर्ट देखें")}</a>
       </motion.div>
+      <motion.p className="l-built tiny" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.7, delay: 0.6 }}>
+        <span>{L("Built on", "आधार")}</span><span className="row gap-1"><Brand b="meta" s={12} label="Meta" /> SAM 3.1 · Muse</span>
+        <span className="row gap-1"><Brand b="openstreetmap" s={14} label="OpenStreetMap" /> OpenStreetMap</span><span className="row gap-1"><Brand b="supabase" s={14} label="Supabase" /> Supabase</span></motion.p>
     </div>
     <motion.figure className="hm-stage card" initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease, delay: 0.15 }}>
       {f?.overlay ? <video src={API + f.overlay} autoPlay muted loop playsInline aria-label={L("Pothole masks drawn by SAM 3.1 on a real ride", "असली राइड पर SAM 3.1 के गड्ढा निशान")} /> : <div className="hm-empty" />}
@@ -94,13 +135,15 @@ function Problem() {
       gsap.to(obj, { v: 2161, duration: 2, ease: "power2.out", onUpdate: () => { el.textContent = Math.round(obj.v).toLocaleString("en-IN"); }, scrollTrigger: { trigger: root.current, start: "top 70%", once: true } });
     });
   }, { scope: root });
-  return <section ref={root} className="l-sec hm-problem" id="problem">
+  return <section ref={root} className="l-sec" id="problem">
+    <Idx i="01" t={L("The problem", "समस्या")} />
+    <div className="hm-problem">
     <div className="l-count"><span className="count">2,161</span></div>
     <div className="hm-problem-text">
       <Lines as="h2" className="l-h3" lines={[L("people died in pothole-related crashes", "लोगों की मौत 2023 में भारत में"), L("in India in 2023. 61% of them in Uttar Pradesh.", "गड्ढों से जुड़े हादसों में हुई। 61% उत्तर प्रदेश में।")]} />
       <motion.p variants={up} {...inView} className="mut">{L("Most of those roads were never reported. The portal takes ten minutes, wants an exact location, and nobody follows up.", "ज़्यादातर सड़कें कभी रिपोर्ट नहीं हुईं। पोर्टल में दस मिनट लगते हैं, सही जगह चाहिए, और कोई फॉलो-अप नहीं करता।")}</motion.p>
       <p className="tiny l-cite">{L("Source: ", "स्रोत: ")}<a href={SRC} target="_blank" rel="noreferrer">MoRTH, Road Accidents in India 2023, Table 3.5 and state annexure</a></p>
-    </div>
+    </div></div>
   </section>;
 }
 
@@ -110,6 +153,7 @@ function Compare() {
   const at = (x: number) => { const r = box.current!.getBoundingClientRect(); setV(Math.max(0, Math.min(100, ((x - r.left) / r.width) * 100))); };
   if (!f) return null;
   return <section className="l-sec" id="record">
+    <Idx i="02" t={L("Detect", "पहचान")} />
     <div className="l-head"><Lines lines={L("Drag to see the road|the way the model does.", "खींचकर देखें, मॉडल|सड़क को कैसे देखता है।").split("|")} className="l-h2" />
       <motion.p variants={up} {...inView} className="l-sub">{L(`Frame ${f.best_frame} of report ${f.id}. Left, the camera with faces and plates blurred. Right, every pothole SAM 3.1 outlined and rated.`, `रिपोर्ट ${f.id} का फ्रेम ${f.best_frame}। बाएं कैमरा, चेहरे-प्लेट धुंधले। दाएं, SAM 3.1 के हर गड्ढे का निशान और रेटिंग।`)}</motion.p></div>
     <motion.div variants={up} {...inView} ref={box} className="cmp card" onPointerDown={e => { drag.current = true; (e.target as HTMLElement).setPointerCapture?.(e.pointerId); at(e.clientX); }}
@@ -135,6 +179,7 @@ function Agent() {
     });
   }, { scope: root, dependencies: [!!f] });
   return <section ref={root} className="l-sec" id="agent">
+    <Idx i="04" t={L("Follow-up", "फॉलो-अप")} />
     <div className="a-grid">
       <div className="l-head"><Lines lines={L("It doesn't stop at detection.|It follows through.", "सिर्फ़ पहचानता नहीं,|अंत तक पीछा करता है।").split("|")} className="l-h2" />
         <motion.p variants={up} {...inView} className="l-sub">{L(`A Muse Spark agent plans and calls seven tools by itself. This is its real log for report ${f?.id || ""}. It fills the portal and waits: you press Submit.`, `Muse Spark एजेंट खुद सात टूल चलाता है। यह रिपोर्ट ${f?.id || ""} का असली लॉग है। फॉर्म भरकर रुकता है, सबमिट आप दबाते हैं।`)}</motion.p>
@@ -154,6 +199,7 @@ function Impact() {
   const max = Math.max(1, ...lb.map(w => w.inr));
   const nums: [string, string][] = s ? [[n(s.reports), L("reports", "रिपोर्ट")], [n(s.hazards), L("hazards mapped", "खतरे दर्ज")], [inr(s.inr_total), L("repair backlog, estimated", "मरम्मत बकाया, अनुमान")], [`${s.filed} of ${s.reports}`, L("complaints filled", "शिकायतें भरी गईं")]] : [];
   return <section className="l-sec" id="impact">
+    <Idx i="05" t={L("Public map", "सार्वजनिक नक्शा")} />
     <div className="l-head"><Lines lines={L("Every report lands|on a public map.", "हर रिपोर्ट जुड़ती है|एक सार्वजनिक नक्शे में।").split("|")} className="l-h2" />
       <motion.p variants={up} {...inView} className="l-sub">{L("Wards are ranked by what they fix. These numbers are read live from the reports.", "वार्डों की रैंकिंग काम से। ये आंकड़े रिपोर्टों से लाइव हैं।")}</motion.p></div>
     <motion.dl className="hm-nums" variants={stagger} {...inView}>{nums.map(([a, b]) => <motion.div key={b} variants={up}><dt className="tiny">{b}</dt><dd className="l-num">{a}</dd></motion.div>)}</motion.dl>
@@ -174,18 +220,20 @@ function Privacy() {
   const L = useL();
   const P: [string, string, string][] = [["eyeoff", L("Blurred before saving", "सेव से पहले धुंधला"), L("SAM 3.1 finds faces and number plates and blurs them before any frame is stored.", "SAM 3.1 चेहरे और नंबर प्लेट ढूंढकर हर फ्रेम सेव होने से पहले धुंधला करता है।")],
     ["shield", L("You press Submit", "सबमिट आप दबाते हैं"), L("The agent never sends a complaint by itself.", "एजेंट खुद कभी शिकायत नहीं भेजता।")],
-    ["user", L("No account needed", "अकाउंट की ज़रूरत नहीं"), L("A report belongs to a place, not a person.", "रिपोर्ट जगह की है, व्यक्ति की नहीं।")]];
-  return <section className="l-sec hm-privacy" id="privacy">
+    ["user", L("Account optional", "अकाउंट वैकल्पिक"), L("Reports work without signing in. Sign in only to keep your list across devices.", "बिना साइन-इन रिपोर्ट करें। साइन-इन सिर्फ़ अपनी सूची हर डिवाइस पर रखने के लिए।")]];
+  return <section className="l-sec" id="privacy">
+    <Idx i="06" t={L("Privacy", "निजता")} />
+    <div className="hm-privacy">
     <Lines lines={[L("Built so nobody gets exposed.", "ऐसा बना कि कोई उजागर न हो।")]} className="l-h2" />
     <motion.ul className="hm-plist" variants={stagger} {...inView}>{P.map(([ic, t, d]) => <motion.li key={t} variants={up}>
       <span className="pv-ico"><Icon n={ic} s={20} /></span><div><h3>{t}</h3><p className="mut">{d}</p></div></motion.li>)}</motion.ul>
-  </section>;
+    </div></section>;
 }
 
 function CTA() {
   const L = useL();
   return <section className="l-sec">
-    <div className="l-cta card">
+    <div className="l-cta">
       <img src="/logo.svg" width={56} height={56} alt="" />
       <Lines lines={[L("Seen a bad road today?", "आज कोई खराब सड़क दिखी?")]} className="l-h2" />
       <motion.p variants={up} {...inView} className="l-sub">{L("It takes about a minute. The paperwork is on us.", "लगभग एक मिनट लगता है। कागज़ी काम हमारा।")}</motion.p>
@@ -199,5 +247,5 @@ export default function Landing() {
   useEffect(() => { get("/stats").then(setS).catch(() => {}); }, []);
   useEffect(() => { if (s) requestAnimationFrame(() => ScrollTrigger.refresh()); }, [s]);
   return <MotionConfig reducedMotion="user"><S.Provider value={s}><Smooth />
-    <main className="wrap landing"><Hero /><Problem /><Compare /><Agent /><Impact /><Privacy /><CTA /></main></S.Provider></MotionConfig>;
+    <main className="wrap landing"><Hero /><Strip /><Problem /><Compare /><Send /><Agent /><Impact /><Privacy /><CTA /></main></S.Provider></MotionConfig>;
 }
