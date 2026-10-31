@@ -5,6 +5,7 @@ Location: OpenStreetMap Nominatim reverse geocoding, following its usage policy
 (https://operations.osmfoundation.org/policies/nominatim/): identifying User-Agent, at most 1 request/second,
 results cached on disk so a point is looked up once, attribution shown in the UI.
 """
+import re
 import json, os, re, threading, time
 from pathlib import Path
 from urllib.parse import quote
@@ -65,7 +66,11 @@ def match_city(*names) -> str | None:
     for n in names:
         if not n:
             continue
-        k = n.strip().lower()
+        raw = n.strip().lower()
+        if raw in ALIASES:
+            return ALIASES[raw]
+        k = re.sub(r"\s*\(.*?\)|\b(greater|municipal corporation|municipal council|nagar nigam|mahanagar palika|corporation|city|district|metropolitan region|urban)\b", "", n.lower())
+        k = re.sub(r"\s+", " ", k).strip(" ,.-")
         if k in ALIASES:
             return ALIASES[k]
         for c in CITIES:
@@ -129,6 +134,92 @@ def reverse(lat: float, lng: float, fetch=None) -> dict | None:
     return g
 
 
+# ---------- location helpers ----------
+def _rate(fn):
+    with _lock:  # shared 1 req/s budget with reverse()
+        wait = 1.0 - (time.monotonic() - _last[0])
+        if wait > 0:
+            time.sleep(wait)
+        try:
+            return fn()
+        except Exception:
+            return None
+        finally:
+            _last[0] = time.monotonic()
+
+
+def iso6709(s: str | None):
+    """'+26.9124+075.7873+431.000/' -> (26.9124, 75.7873)."""
+    m = re.match(r"\s*([+-]\d+(?:\.\d+)?)([+-]\d+(?:\.\d+)?)", s or "")
+    if not m:
+        return None
+    lat, lng = float(m.group(1)), float(m.group(2))
+    return (lat, lng) if -90 <= lat <= 90 and -180 <= lng <= 180 and (lat, lng) != (0.0, 0.0) else None
+
+
+def video_gps(path) -> tuple[float, float] | None:
+    """GPS from video container metadata (iPhone/Android MP4/MOV 'location' tags), via ffprobe."""
+    import subprocess
+    try:
+        out = subprocess.run(["ffprobe", "-v", "error", "-print_format", "json", "-show_format", "-show_streams", str(path)],
+                             capture_output=True, text=True, timeout=20).stdout
+        j = json.loads(out or "{}")
+    except Exception:
+        return None
+    tags = [j.get("format", {}).get("tags", {})] + [st.get("tags", {}) for st in j.get("streams", [])]
+    for t in tags:
+        for k, v in (t or {}).items():
+            if "location" in k.lower() and (g := iso6709(v)):
+                return g
+    return None
+
+
+def place(lat: float, lng: float, fetch=None) -> dict:
+    """Reverse-geocode a point and map it to a supported city + its authorities."""
+    g = reverse(lat, lng, fetch=fetch)
+    if not g:
+        return {"ok": False, "error": "geocoder unavailable", "lat": lat, "lng": lng}
+    city = match_city(g.get("city"), g.get("state_district"), g.get("county"), g.get("state"))
+    auths = [a["authority"] for a in AUTH if a["city"] == city]
+    if city == "Delhi":
+        d = delhi_route(g); auths = [BY_ID[d["choice"]]["authority"]] if d.get("choice") else auths
+    loc = g.get("suburb") or g.get("road")
+    label = ", ".join(x for x in (loc, city or g.get("city") or g.get("state_district"), g.get("state")) if x)
+    return {"ok": True, "lat": lat, "lng": lng, "locality": loc, "raw_city": g.get("city") or g.get("state_district"), "city": city,
+            "supported": bool(city), "authorities": auths, "label": label, "country_code": g.get("country_code"),
+            "display": g.get("display"), "source": g["source"]}
+
+
+SEARCH = os.getenv("NOMINATIM_SEARCH_URL", "https://nominatim.openstreetmap.org/search")
+
+
+def search(q: str, fetch=None) -> list[dict]:
+    """Manual city search: our supported cities first (instant, no network), then Nominatim for anything else."""
+    q = (q or "").strip()
+    if len(q) < 2:
+        return []
+    ql = q.lower()
+    local = [c for c in CITIES if c.lower().startswith(ql)] + [v for k, v in ALIASES.items() if k.startswith(ql)]
+    out = [{"city": c, "label": c, "supported": True} for c in dict.fromkeys(local)]
+    if out or (fetch is None and os.getenv("GG_OFFLINE_GEO") == "1"):
+        return out[:6]
+    key = "q:" + ql; c = _cache()
+    if key in c:
+        return c[key]
+    import httpx
+    fetch = fetch or (lambda: httpx.get(SEARCH, params={"q": q, "format": "jsonv2", "addressdetails": 1, "limit": 5, "accept-language": "en"},
+                                        headers={"User-Agent": UA}, timeout=8).json())
+    j = _rate(fetch) or []
+    res = []
+    for it in j if isinstance(j, list) else []:
+        a = it.get("address", {})
+        city = match_city(a.get("city"), a.get("town"), a.get("state_district"), a.get("county"), a.get("state"))
+        res.append({"city": city, "label": it.get("display_name", "")[:90], "supported": bool(city),
+                    "lat": float(it["lat"]), "lng": float(it["lon"])})
+    c = _cache(); c[key] = res; pipeline.write_json(_cfile(), c)
+    return res
+
+
 # ---------- Delhi jurisdiction ----------
 NDMC_PIN = {"110001", "110002", "110003", "110004", "110011", "110021", "110023"}  # Lutyens' Delhi / NDMC area postcodes
 NDMC_AREAS = ("connaught place", "chanakyapuri", "lodhi", "lutyens", "gole market", "rashtrapati bhavan", "india gate", "janpath",
@@ -166,7 +257,9 @@ def route(r: dict, city: str | None = None, pick: str | None = None, fetch=None)
         g = reverse(r["lat"], r["lng"], fetch=fetch)
     detected = match_city(g.get("city"), g.get("state_district"), g.get("county"), g.get("state")) if g else None
     chosen = match_city(city) if city else detected
-    out = {"detected_city": detected, "city": chosen, "overridden": bool(city), "geo": g, "cities": CITIES, "osm_credit": OSM_CREDIT if g else None}
+    out = {"detected_city": detected, "city": chosen, "overridden": bool(city), "geo": g, "cities": CITIES, "osm_credit": OSM_CREDIT if g else None,
+           "loc_source": r.get("loc_source") or ("browser" if g else None), "lat": r.get("lat"), "lng": r.get("lng"),
+           "place": ", ".join(x for x in ((g or {}).get("suburb") or (g or {}).get("road"), detected or (g or {}).get("city")) if x) or None}
     country = (g or {}).get("country_code") or ("IN" if not chosen else next(a["country"] for a in AUTH if a["city"] == chosen))
     if chosen == "Delhi":
         d = delhi_route(g if not city or detected == "Delhi" else None)

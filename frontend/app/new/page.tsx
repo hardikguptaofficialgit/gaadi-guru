@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { API, get } from "../api";
 import { useT, Stepper, mine } from "../i18n";
 import Icon from "../Icon";
+import Where, { Loc } from "./Where";
 const ORDER = ["prepare", "plan", "scan", "upload", "sam", "privacy", "render", "write"];
 const LABEL: Record<string, [string, string]> = { prepare: ["Preparing your ride", "आपकी राइड तैयार हो रही है"], plan: ["Muse Spark is reading the road", "Muse Spark सड़क देख रहा है"],
   scan: ["Searching for other hazards", "दूसरे खतरे ढूंढ रहे हैं"], upload: ["Sending frames to SAM", "फ्रेम SAM को भेज रहे हैं"], sam: ["Measuring each pothole", "हर गड्ढे का साइज़ नाप रहे हैं"],
@@ -11,19 +12,17 @@ const LABEL: Record<string, [string, string]> = { prepare: ["Preparing your ride
 export default function New() {
   const r = useRouter(); const { t, lang } = useT();
   const [file, setFile] = useState<File | null>(null); const [voice, setVoice] = useState<File | null>(null);
-  const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null); const [locState, setLocState] = useState<"wait" | "ok" | "no">("wait");
+  const [loc, setLoc] = useState<Loc>({ src: null });
   const [ward, setWard] = useState(""); const [wards, setWards] = useState<string[]>([]); const [near, setNear] = useState<any[]>([]); const [voted, setVoted] = useState<string[]>([]);
   const [busy, setBusy] = useState(false); const [job, setJob] = useState<any>(null); const [err, setErr] = useState("");
-  useEffect(() => {
-    if (!navigator.geolocation) { setLocState("no"); return; }
-    navigator.geolocation.getCurrentPosition(p => { const c = { lat: p.coords.latitude, lng: p.coords.longitude }; setPos(c); setLocState("ok"); get(`/geo/reverse?lat=${c.lat}&lng=${c.lng}`).then(g => g?.locality && setWard(w => w || g.locality)).catch(() => {});
-      get(`/nearby?lat=${c.lat}&lng=${c.lng}`).then(setNear).catch(() => {}); }, () => setLocState("no"), { timeout: 6000 });
-  }, []);
+  useEffect(() => { if (loc.locality) setWard(w => w || loc.locality!);
+    if (loc.src === "browser" && loc.lat != null) get(`/nearby?lat=${loc.lat}&lng=${loc.lng}`).then(setNear).catch(() => {}); }, [loc.lat, loc.lng, loc.locality, loc.src]);
   useEffect(() => { get("/wards").then(setWards).catch(() => {}); }, []);
   async function go() {
     if (!file) return; setBusy(true); setJob(null); setErr("");
     const fd = new FormData(); fd.append("video", file); fd.append("ward", ward); if (voice) fd.append("voice_note", voice);
-    if (pos) { fd.append("lat", String(pos.lat)); fd.append("lng", String(pos.lng)); }
+    if (loc.lat != null && loc.lng != null) { fd.append("lat", String(loc.lat)); fd.append("lng", String(loc.lng)); }
+    if (loc.src) fd.append("loc_source", loc.src); if (loc.src === "manual" && loc.city) fd.append("city", loc.city);
     try { const x = await fetch(API + "/jobs", { method: "POST", body: fd }); if (!x.ok) throw new Error(await x.text()); const { job_id } = await x.json();
       for (;;) { await new Promise(z => setTimeout(z, 1000)); const j = await get(`/jobs/${job_id}`); setJob(j);
         if (j.state === "done") { mine.add(j.report_id); r.push(`/report?id=${j.report_id}`); return; }
@@ -56,10 +55,9 @@ export default function New() {
       <label className="field">{t("voice")}
         <span className={"drop sm" + (voice ? " has" : "")}><input type="file" accept="audio/*" aria-label={t("voice")} onChange={e => setVoice(e.target.files?.[0] || null)} />
           <span className={"ico-tile" + (voice ? " ok" : "")}><Icon n="mic" /></span><b>{voice ? voice.name : t("voiceHint")}</b></span></label>
-      <div className="g2">
-        <div className="field">{t("loc")}<div className="glass chip-line"><Icon n="pin" s={18} />{locState === "ok" ? t("locOk") : locState === "wait" ? "…" : t("locNo")}</div></div>
-        <label className="field">{t("ward")}<input value={ward} list="wards" placeholder={H ? "वार्ड / इलाका" : "Ward / locality"} onChange={e => setWard(e.target.value)} data-testid="ward-input" />
-          <datalist id="wards">{wards.map(w => <option key={w} value={w} />)}</datalist></label></div>
+      <Where H={H} onChange={setLoc} />
+      <label className="field">{t("ward")}<input value={ward} list="wards" placeholder={H ? "वार्ड / इलाका" : "Ward / locality"} onChange={e => setWard(e.target.value)} data-testid="ward-input" />
+        <datalist id="wards">{wards.map(w => <option key={w} value={w} />)}</datalist></label>
       <button className="btn primary lg block" disabled={!file} onClick={go} data-testid="check-road">{t("check")}<Icon n="arrow" s={18} /></button>
       {err && <p role="alert" style={{ color: "var(--crit)" }}>{err}</p>}
     </div>}

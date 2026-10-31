@@ -44,11 +44,13 @@ STAGE_ORDER = ["hash", "prepare", "plan", "scan", "upload", "sam", "privacy", "r
 
 @app.post("/jobs")
 async def job_start(video: UploadFile = File(...), lat: float | None = Form(None), lng: float | None = Form(None),
-                    voice_note: UploadFile | None = File(None), ward: str | None = Form(None), reride_of: str | None = Form(None)):
+                    voice_note: UploadFile | None = File(None), ward: str | None = Form(None), reride_of: str | None = Form(None),
+                    loc_source: str | None = Form(None), city: str | None = Form(None)):
     if reride_of:
         o = _load(reride_of)
         if lat is None: lat, lng = o.get("lat"), o.get("lng")
         ward = ward or o.get("ward")
+    src = loc_source if loc_source in ("browser", "manual") and (lat is not None or city) else None
     jid = uuid.uuid4().hex[:10]
     tmp = pipeline.DATA / f"upload_{jid}_{Path(video.filename or 'clip').name}"
     tmp.write_bytes(await video.read())
@@ -70,7 +72,13 @@ async def job_start(video: UploadFile = File(...), lat: float | None = Form(None
                 subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-loop", "1", "-i", str(tmp), "-t", "1", "-r", "5",
                                 "-vf", "scale='min(1280,iw)':-2,format=yuv420p", "-c:v", "libx264", str(mp4)], check=True)
                 tmp.unlink(missing_ok=True); tmp = mp4
+            nonlocal lat, lng, src
+            if not is_img and (g := routing.video_gps(tmp)):  # the video's own GPS beats the phone's current position
+                lat, lng = g; src = "video"
             r = pipeline.run(tmp, lat, lng, vn, ward=ward, progress=prog)
+            if src or city:
+                r["loc_source"] = src; r["city_pick"] = routing.match_city(city) if city else None
+                pipeline.write_json(pipeline.DATA / r["id"] / "result.json", r)
             if reride_of and reride_of != r["id"]:  # Re-ride: run the verify_repair tool for real and log it on the original's timeline
                 prog("verify", "Comparing with the original report")
                 agent._log(reride_of, {"kind": "tool_call", "tool": "verify_repair", "args": {"report_id": reride_of, "reride_report_id": r["id"]}})
@@ -292,11 +300,13 @@ def frame(rid: str, kind: str = "raw", i: int | None = None):
 
 @app.get("/geo/reverse")
 def geo_reverse(lat: float, lng: float):
-    """Locality from OpenStreetMap Nominatim, via the shared policy-compliant client (UA, 1 req/s, disk cache)."""
-    g = routing.reverse(lat, lng)
-    if not g:
-        return {"error": "geocoder unavailable"}
-    return {"locality": g.get("suburb") or g.get("road"), "city": g.get("city") or g.get("state_district"), "display": g.get("display"), "source": g["source"]}
+    """Place for a point: OSM Nominatim (UA, 1 req/s, disk cache) mapped to a supported city and its authority."""
+    return routing.place(lat, lng)
+
+
+@app.get("/geo/search")
+def geo_search(q: str):
+    return routing.search(q)
 
 
 def _site(site: str | None) -> str:
@@ -315,7 +325,8 @@ def authorities_list():
 @app.get("/reports/{rid}/route")
 def report_route(rid: str, city: str | None = None, pick: str | None = None):
     """Who should get this report: reverse-geocoded city (user can override), Delhi jurisdiction choice, verified contacts."""
-    return routing.route(_load(rid), city=city, pick=pick)
+    r = _load(rid)
+    return routing.route(r, city=city or r.get("city_pick"), pick=pick)
 
 
 @app.get("/reports/{rid}/mailto")
@@ -419,7 +430,7 @@ async def offline_ride(frames: list[UploadFile] = File(...), lat: float | None =
     import shutil; shutil.rmtree(d, ignore_errors=True)
     up = UploadFile(file=open(out, "rb"), filename=out.name, headers={"content-type": "video/mp4"})
     try:
-        res = await job_start(video=up, lat=lat, lng=lng, voice_note=None, ward=ward, reride_of=None)
+        res = await job_start(video=up, lat=lat, lng=lng, voice_note=None, ward=ward, reride_of=None, loc_source=None, city=None)
     finally:
         up.file.close(); out.unlink(missing_ok=True)
     return {**res, "frames": len(frames)}

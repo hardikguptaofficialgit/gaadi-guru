@@ -33,7 +33,7 @@ function Reride({ r, H, onDone }: { r: any; H: boolean; onDone: () => void }) {
         <button className="btn primary lg block" disabled={!file} onClick={go} data-testid="reride-go">{T("Compare with original", "पुराने से तुलना करें")}</button></>}
       {busy && <div className="stack center gap-2" role="status"><div className="spinner" /><b>{job.stage ? `${job.stage}…` : T("Uploading…", "अपलोड…")}</b>{job.cache_hit && <span className="tiny">{T("Saved result reused", "सेव नतीजा")}</span>}</div>}
       {job?.state === "done" && <div className="stack gap-3" data-testid="reride-result">
-        {v ? <><div className="row"><VerdictBadge v={v.verdict} hi={H} /><span className="tiny num">{v.before?.count ?? "—"} → {v.after?.count ?? "—"} {T("hazards", "खतरे")}{v.distance_m != null ? ` · ${Math.round(v.distance_m)} m` : ""}</span></div>
+        {v ? <><div className="row"><VerdictBadge v={v.verdict} hi={H} /><span className="tiny num">{v.before?.count ?? "—"} <Icon n="arrow" s={12} /> {v.after?.count ?? "—"} {T("hazards", "खतरे")}{v.distance_m != null ? ` · ${Math.round(v.distance_m)} m` : ""}</span></div>
           {v.note && <p className="mut small">{v.note}</p>}</> : <p className="mut small">{T("No comparison returned.", "तुलना नहीं मिली।")}</p>}
         <div className="row"><button className="btn primary" onClick={() => setOpen(false)}>{T("Done", "ठीक है")}</button><Link className="btn ghost" href={`/report?id=${job.report_id}`}>{T("Open re-ride report", "री-राइड रिपोर्ट")}</Link></div></div>}
       {err && <p role="alert" style={{ color: "var(--crit)" }}>{err}</p>}
@@ -90,7 +90,7 @@ function R() {
           <figcaption className="tiny">{H ? "Muse Wonder ने भरा फॉर्म (डेमो पोर्टल) — सबमिट आप करेंगे" : "Form filled by Muse Wonder (demo portal). You press Submit."}</figcaption></figure>}
         <div className="stack gap-3">
           {r.verification && <div className="well stack gap-1" data-testid="verification"><div className="row between"><b className="small">{H ? "री-राइड जांच" : "Re-ride check"}</b><VerdictBadge v={r.verification.verdict} hi={H} /></div>
-            <span className="tiny num">{r.verification.before?.count ?? "—"} → {r.verification.after?.count ?? "—"} {H ? "खतरे" : "hazards"}{r.verification.distance_m != null ? ` · ${Math.round(r.verification.distance_m)} m` : ""}</span>{r.verification.note && <p className="small mut">{r.verification.note}</p>}</div>}
+            <span className="tiny num">{r.verification.before?.count ?? "—"} <Icon n="arrow" s={12} /> {r.verification.after?.count ?? "—"} {H ? "खतरे" : "hazards"}{r.verification.distance_m != null ? ` · ${Math.round(r.verification.distance_m)} m` : ""}</span>{r.verification.note && <p className="small mut">{r.verification.note}</p>}</div>}
           <span className="tiny">{t("share")}</span><Share id={r.id} text={shareText} />
           <a className="og-prev" href={`/r/${r.id}`} target="_blank" rel="noreferrer"><img src={`/r/${r.id}/opengraph-image`} alt="Share card preview" /><div className="tiny">{H ? "शेयर कार्ड प्रीव्यू" : "Share card preview (WhatsApp / X)"}</div></a>
         </div></div></section>}

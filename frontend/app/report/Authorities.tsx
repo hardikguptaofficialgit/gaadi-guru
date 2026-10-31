@@ -81,6 +81,10 @@ export default function Authorities({ r, H }: { r: any; H: boolean }) {
   return <section className="card stack gap-4" data-testid="authorities">
     <div className="stack gap-1"><span className="eyebrow">{H ? "किसे भेजें" : "Who to send it to"}</span>
       <h3>{o.city ? (H ? `${o.city} की ज़िम्मेदार संस्था` : `Responsible authority in ${o.city}`) : (H ? "अपना शहर चुनें" : "Pick your city")}</h3></div>
+    {(o.place || o.city) && <div className="where ok" data-testid="report-place"><span className="ico-tile ok"><Icon n="pin" /></span>
+      <div className="stack grow"><b>{o.place || o.city}</b><span className="tiny">{({ video: H ? "वीडियो के GPS से" : "From the video's GPS", browser: H ? "आपके फ़ोन की लोकेशन से" : "From your phone's location",
+        manual: H ? "आपने चुना" : "You picked this" } as any)[o.overridden ? "manual" : o.loc_source] || (H ? "आपने चुना" : "You picked this")}{o.lat != null ? ` · ${(+o.lat).toFixed(4)}, ${(+o.lng).toFixed(4)}` : ""}</span></div>
+      <button type="button" className="btn ghost sm" onClick={() => (document.querySelector('[data-testid="city"]') as HTMLSelectElement)?.focus()}>{H ? "बदलें" : "Change"}</button></div>}
     <label className="field">{H ? "शहर" : "City"}
       <select value={o.city || ""} onChange={e => { setCity(e.target.value); setPick(""); }} data-testid="city">
         <option value="">{H ? "चुनें…" : "Choose…"}</option>{o.cities.map((c: string) => <option key={c} value={c}>{c}</option>)}</select>

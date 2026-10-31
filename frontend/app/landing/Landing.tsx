@@ -99,7 +99,7 @@ function Send() {
 /* Hallmark redesign: one idea per screen, no eyebrows, no feature grid, page ends on its one action. */
 function Hero() {
   const s = useContext(S); const f = s?.featured; const L = useL();
-  return <section className="hm-hero">
+  return <section className="hm-hero bg-topo">
     <div className="hm-hero-copy">
       <Lines now as="h1" className="l-h1" delay={0.05} lines={L("Every bad road,|reported in one tap.", "हर खराब सड़क,|एक टैप में रिपोर्ट।").split("|")} />
       <motion.p className="l-lead" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease, delay: 0.35 }}>
