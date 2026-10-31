@@ -14,7 +14,7 @@ Return JSON: {"subject": str, "body_en": str (<= 160 words), "body_hi": str (<= 
 
 
 def load() -> dict:
-    return json.loads(F.read_text()) if F.exists() else {}
+    return json.loads(F.read_text(encoding="utf-8")) if F.exists() else {}
 
 
 def _template(r: dict, days_over: int, verdict: str | None) -> dict:
@@ -39,7 +39,7 @@ def run_due(today: str | None = None, llm: bool = True, only: str | None = None)
             f = DATA / rid / "result.json"
             if not f.exists():
                 fu["state"] = "closed"; fu["reason"] = "report missing"; continue
-            r = json.loads(f.read_text()); v = (r.get("verification") or {}).get("verdict")
+            r = json.loads(f.read_text(encoding="utf-8")); v = (r.get("verification") or {}).get("verdict")
             fu["checked_at"] = dt.datetime.now().isoformat(timespec="seconds")
             if r.get("status") == "fixed" or v == "FIXED":
                 fu["state"] = "closed"; fu["reason"] = "verified fixed"; out.append({"id": rid, "action": "closed"}); continue
@@ -51,7 +51,7 @@ def run_due(today: str | None = None, llm: bool = True, only: str | None = None)
                     facts = {"ward": r.get("ward"), "hazards": len(r["potholes"]), "location": [r.get("lat"), r.get("lng")], "filed_at": r.get("filed_at"),
                              "followup_due": fu["due"], "days_overdue": days_over, "repair_estimate_inr": r.get("repair_total_inr"), "reride_verdict": v,
                              "original_subject": (r.get("report") or {}).get("subject")}
-                    d = meta.spark_json(ESC_SYSTEM, json.dumps(facts, ensure_ascii=False))
+                    d = meta.spark_json(ESC_SYSTEM, json.dumps(facts, ensure_ascii=False), effort="minimal")
                     if d.get("subject") and d.get("body_en"):
                         draft, src = d, "muse-spark"
                 except Exception as e:
@@ -59,11 +59,11 @@ def run_due(today: str | None = None, llm: bool = True, only: str | None = None)
             draft = draft or _template(r, days_over, v)
             esc = {**draft, "body_en": pipeline.clean_complaint(draft["body_en"]), "report_id": rid, "drafted_at": fu["checked_at"], "source": src,
                    "days_overdue": days_over, "as_of": today, "simulated_date": today != dt.date.today().isoformat(), "reride_verdict": v, "sent": False, "note": "Draft only. Nothing is sent; the citizen decides."}
-            (DATA / rid / "escalation.json").write_text(json.dumps(esc, ensure_ascii=False, indent=2))
+            (DATA / rid / "escalation.json").write_text(json.dumps(esc, ensure_ascii=False, indent=2), encoding="utf-8")
             fu["state"] = "escalated"; fu["escalation"] = {"at": fu["checked_at"], "source": src}
-            r["escalation"] = {"at": fu["checked_at"], "source": src}; f.write_text(json.dumps(r, ensure_ascii=False, indent=2, default=str))
+            r["escalation"] = {"at": fu["checked_at"], "source": src}; pipeline.write_json(f, r, ensure_ascii=False, indent=2, default=str)
             out.append({"id": rid, "action": "escalation_drafted", "source": src, "days_overdue": days_over})
-        F.write_text(json.dumps(fl, indent=2, ensure_ascii=False))
+        F.write_text(json.dumps(fl, indent=2, ensure_ascii=False), encoding="utf-8")
     return {"today": today, "processed": out}
 
 

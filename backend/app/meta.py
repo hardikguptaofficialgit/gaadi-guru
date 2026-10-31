@@ -35,7 +35,7 @@ def api_key() -> str:
     if not key:
         p = Path(os.environ.get("MODEL_API_KEY_FILE", "/workspace/.meta_key"))
         if p.exists():
-            key = p.read_text().strip()
+            key = p.read_text(encoding="utf-8").strip()
     if not key:
         raise RuntimeError("MODEL_API_KEY not set")
     return key
@@ -172,11 +172,14 @@ def upload_file(path: Path, purpose: str = "user_data") -> str:
 
 
 # ---------------- Muse Spark ----------------
-def spark_json(system: str, user: str | list, model: str = SPARK) -> dict:
+def spark_json(system: str, user: str | list, model: str = SPARK, effort: str | None = "low") -> dict:
+    """One JSON-only Spark call. `effort` sets reasoning effort (minimal|low|medium|high): Spark bills
+    its hidden reasoning as output tokens, so plain write-up tasks use 'minimal' (~10x fewer output tokens)."""
     content = user if isinstance(user, list) else [{"type": "input_text", "text": user}]
     costs.guard(0.02)
+    kw = {"reasoning": {"effort": effort}} if effort else {}
     resp = client().responses.create(model=model, instructions=system,
-                                     input=[{"role": "user", "content": content}])
+                                     input=[{"role": "user", "content": content}], **kw)
     record_usage(resp, model)
     txt = resp.output_text.strip()
     m = re.search(r"\{.*\}", txt, re.S)
@@ -219,7 +222,7 @@ if os.environ.get("GG_FAKE_META") == "1":
     def upload_file(path, purpose="user_data"):  # noqa: F811
         return "fake-file"
 
-    def spark_json(system, user, model=SPARK):  # noqa: F811
+    def spark_json(system, user, model=SPARK, effort=None):  # noqa: F811
         return {}
 
     def transcribe(wav_bytes, languages=None, keywords=None):  # noqa: F811

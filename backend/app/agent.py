@@ -36,11 +36,11 @@ def _load(rid: str) -> dict:
     f = DATA / rid / "result.json"
     if "/" in rid or ".." in rid or not f.exists():
         raise ValueError(f"unknown report {rid}")
-    return json.loads(f.read_text())
+    return json.loads(f.read_text(encoding="utf-8"))
 
 
 def _save(r: dict) -> None:
-    (DATA / r["id"] / "result.json").write_text(json.dumps(r, indent=2, ensure_ascii=False))
+    pipeline.write_json(DATA / r["id"] / "result.json", r, indent=2, ensure_ascii=False)
 
 
 def _hav(a, b) -> float:
@@ -51,7 +51,7 @@ def _hav(a, b) -> float:
 
 
 def all_reports() -> list[dict]:
-    return [json.loads(f.read_text()) for f in DATA.glob("*/result.json")]
+    return [json.loads(f.read_text(encoding="utf-8")) for f in DATA.glob("*/result.json")]
 
 
 # ---------------- tools ----------------
@@ -92,7 +92,7 @@ def draft_complaint(report_id: str, **_):
 def file_complaint(report_id: str, _emit=None, **_):
     r = _load(report_id); f = DATA / report_id / "wonder.json"
     if f.exists():  # budget: reuse the already pre-filled form for this report
-        res = json.loads(f.read_text()); res["cached"] = True
+        res = json.loads(f.read_text(encoding="utf-8")); res["cached"] = True
     else:
         from . import main  # reuse endpoint logic
         c = r.get("contact") or {}
@@ -106,9 +106,9 @@ def file_complaint(report_id: str, _emit=None, **_):
 
 def schedule_followup(report_id: str, days: int = 7, **_):
     r = _load(report_id); due = (dt.date.today() + dt.timedelta(days=days or 7)).isoformat()
-    fl = json.loads(FOLLOWUPS.read_text()) if FOLLOWUPS.exists() else {}
+    fl = json.loads(FOLLOWUPS.read_text(encoding="utf-8")) if FOLLOWUPS.exists() else {}
     fl[report_id] = {"due": due, "ward": r.get("ward"), "created": dt.date.today().isoformat()}
-    FOLLOWUPS.write_text(json.dumps(fl, indent=2))
+    FOLLOWUPS.write_text(json.dumps(fl, indent=2), encoding="utf-8")
     r["status"] = "promised" if r.get("status") == "filed" else r.get("status", "reported"); r["followup_due"] = due; _save(r)
     return {"followup_due": due}
 
@@ -144,12 +144,12 @@ FUNCS = {f.__name__: f for f in [analyze_video, check_duplicates, estimate_repai
 # ---------------- loop ----------------
 def _log(rid, ev):
     ev["t"] = time.time()
-    with (DATA / rid / "agent.jsonl").open("a") as f:
+    with (DATA / rid / "agent.jsonl").open("a", encoding="utf-8") as f:
         f.write(json.dumps(ev, ensure_ascii=False, default=str) + "\n")
 
 
 def run(rid: str, reride: str | None = None, max_turns: int = 12):
-    (DATA / rid / "agent.jsonl").write_text("")
+    (DATA / rid / "agent.jsonl").write_text("", encoding="utf-8")
     _log(rid, {"kind": "start", "text": f"Agent started for report {rid}" + (f" (re-ride {reride})" if reride else "")})
     c = meta.client()
     task = f"Report id: {rid}." + (f" reride_report_id: {reride}." if reride else " No re-ride yet.")
@@ -189,4 +189,4 @@ def start(rid: str, reride: str | None = None):
 
 def steps(rid: str) -> list[dict]:
     f = DATA / rid / "agent.jsonl"
-    return [json.loads(l) for l in f.read_text().splitlines() if l.strip()] if f.exists() else []
+    return [json.loads(l) for l in f.read_text(encoding="utf-8").splitlines() if l.strip()] if f.exists() else []

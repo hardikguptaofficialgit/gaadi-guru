@@ -21,7 +21,7 @@ class BudgetExceeded(RuntimeError):
 def total() -> float:
     if not LOG.exists():
         return 0.0
-    return round(sum(json.loads(l)["usd"] for l in LOG.read_text().splitlines() if l.strip()), 4)
+    return round(sum(json.loads(l)["usd"] for l in LOG.read_text(encoding="utf-8").splitlines() if l.strip()), 4)
 
 
 def guard(estimate: float = 0.0) -> None:
@@ -32,7 +32,7 @@ def guard(estimate: float = 0.0) -> None:
 
 def record(kind: str, usd: float, **meta) -> float:
     LOG.parent.mkdir(parents=True, exist_ok=True)
-    with _lock, LOG.open("a") as f:
+    with _lock, LOG.open("a", encoding="utf-8") as f:
         f.write(json.dumps({"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "kind": kind, "usd": round(usd, 6), **meta}) + "\n")
     return usd
 
@@ -40,7 +40,7 @@ def record(kind: str, usd: float, **meta) -> float:
 def summary() -> dict:
     by = {}
     if LOG.exists():
-        for l in LOG.read_text().splitlines():
+        for l in LOG.read_text(encoding="utf-8").splitlines():
             if l.strip():
                 r = json.loads(l); by[r["kind"]] = round(by.get(r["kind"], 0) + r["usd"], 4)
     return {"total_usd": total(), "limit_usd": LIMIT, "hard_cap_usd": 75.0, "by_kind": by}

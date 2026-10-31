@@ -5,19 +5,22 @@ Hard guardrail: any click that lands on a submit control is refused and ends the
 always reviews and presses Submit themselves.
 """
 from __future__ import annotations
-import base64, json, time
+import base64, json, os, time
 from pathlib import Path
 from . import meta
 
 W, H = 1280, 900
 TASK = """You are filling a municipal public-grievance web form for a citizen. Fill every field that has a value in this data (leave a field empty if its value is ""):
 {data}
-For dropdowns pick the closest option (Category = "Roads & Potholes"). Click a field before typing in it.
+For dropdowns pick the closest option (Category = "Roads & Potholes").
+Use cua_fill(x, y, text) to click a field and type into it in one step. You may call cua_fill for
+several fields in the same turn; the screenshot after the last call shows the result.
 When all fields are filled, DO NOT click Submit. Stop and say "READY FOR REVIEW"."""
 
 
 def _shot(page) -> str:
-    return "data:image/png;base64," + base64.b64encode(page.screenshot()).decode()
+    # JPEG q70 is ~5x smaller than PNG on a form page; text stays crisp enough to read
+    return "data:image/jpeg;base64," + base64.b64encode(page.screenshot(type="jpeg", quality=70)).decode()
 
 
 def _is_submit(page, x, y) -> bool:
@@ -34,6 +37,13 @@ def _do(page, a: dict) -> str | None:
         # <select> needs a keyboard-friendly path in headless chromium
         page.mouse.click(x, y, button=a.get("button", "left") if a.get("button") in ("left", "right") else "left",
                          click_count=2 if t == "double_click" else 1)
+    elif t == "fill":
+        if _is_submit(page, a["x"], a["y"]):
+            return "BLOCKED_SUBMIT"
+        page.mouse.click(a["x"], a["y"])
+        if page.evaluate("document.activeElement && ['INPUT','TEXTAREA'].includes(document.activeElement.tagName)"):
+            page.keyboard.press("Control+A"); page.keyboard.press("Delete")
+        return _do(page, {"type": "type", "text": a["text"]})
     elif t == "type":
         tag = page.evaluate("document.activeElement && document.activeElement.tagName")
         if tag == "SELECT":
@@ -63,6 +73,8 @@ def _do(page, a: dict) -> str | None:
 
 
 CUA_TOOLS = [
+    {"type": "function", "name": "cua_fill", "description": "Click the field at pixel x,y of the latest screenshot, then type text into it (a dropdown picks the matching option). Replaces any existing value.",
+     "parameters": {"type": "object", "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}, "text": {"type": "string"}}, "required": ["x", "y", "text"]}},
     {"type": "function", "name": "cua_left_click", "description": "Left-click at pixel x,y of the latest screenshot.",
      "parameters": {"type": "object", "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}}, "required": ["x", "y"]}},
     {"type": "function", "name": "cua_type_text", "description": "Type text into the focused field (for a focused dropdown, picks the matching option).",
@@ -75,12 +87,15 @@ CUA_TOOLS = [
 ]
 SYSTEM = ("You operate a web browser ONLY through the cua_* tools. Each tool returns a new screenshot "
           f"({W}x{H} px; coordinates are pixels of that screenshot). Never click the Submit button.")
-_MAP = {"cua_left_click": lambda a: {"type": "click", **a}, "cua_type_text": lambda a: {"type": "type", **a},
+_MAP = {"cua_fill": lambda a: {"type": "fill", **a}, "cua_left_click": lambda a: {"type": "click", **a}, "cua_type_text": lambda a: {"type": "type", **a},
         "cua_press_key": lambda a: {"type": "keypress", "keys": [a.get("key", "")]},
         "cua_scroll": lambda a: {"type": "scroll", "scroll_y": a.get("dy", 0)}, "cua_screenshot": lambda a: {"type": "screenshot"}}
 
 
-def fill_complaint(url: str, data: dict, out_dir: Path, max_steps: int = 30, on_step=None) -> dict:
+MODEL = os.environ.get("PORTAL_MODEL", "muse-wonder-1.0")
+
+
+def fill_complaint(url: str, data: dict, out_dir: Path, max_steps: int = 12, on_step=None) -> dict:
     """Muse Wonder drives the form via function-call computer tools (the native `computer` tool
     is not enabled on our key, so we expose the same observe-act loop as cua_* functions)."""
     from playwright.sync_api import sync_playwright
@@ -89,8 +104,10 @@ def fill_complaint(url: str, data: dict, out_dir: Path, max_steps: int = 30, on_
     with sync_playwright() as p:
         br = p.chromium.launch(); page = br.new_page(viewport={"width": W, "height": H}); page.goto(url)
         meta.costs.guard(0.5)
-        c = meta.client(); model = "muse-wonder-1.0"
-        kw = dict(model=model, instructions=SYSTEM, tools=CUA_TOOLS, parallel_tool_calls=False)
+        c = meta.client(); model = MODEL
+        # parallel calls: the model fills several fields per turn, so one paid turn ~ many actions
+        kw = dict(model=model, instructions=SYSTEM, tools=CUA_TOOLS, parallel_tool_calls=True,
+                  reasoning={"effort": os.environ.get("PORTAL_EFFORT", "low")})
         convo = [{"role": "user", "content": [
             {"type": "input_text", "text": TASK.format(data=json.dumps(data, ensure_ascii=False, indent=1))},
             {"type": "input_image", "image_url": _shot(page)}]}]
@@ -109,8 +126,9 @@ def fill_complaint(url: str, data: dict, out_dir: Path, max_steps: int = 30, on_
                 blocked = _do(page, a) if a["type"] != "screenshot" else None
                 if blocked: break
                 time.sleep(0.15)
-                outs.append({"type": "function_call_output", "call_id": call.call_id,
-                             "output": [{"type": "input_image", "image_url": _shot(page)}]})
+                outs.append({"type": "function_call_output", "call_id": call.call_id, "output": "ok"})
+            if outs:  # one screenshot per turn (after the last action), not one per action
+                outs[-1]["output"] = [{"type": "input_image", "image_url": _shot(page)}]
             if blocked:
                 stop = "stopped_before_submit"; break
             page.screenshot(path=str(out_dir / f"wonder_step_{step:02d}.png"))

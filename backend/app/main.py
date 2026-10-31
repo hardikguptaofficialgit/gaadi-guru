@@ -98,7 +98,10 @@ def job_status(jid: str):
 def reports():
     out = []
     for f in sorted(pipeline.DATA.glob("*/result.json"), key=lambda p: p.stat().st_mtime, reverse=True):
-        r = json.loads(f.read_text())
+        try:
+            r = json.loads(f.read_text(encoding="utf-8")); r["id"], r["potholes"]
+        except Exception:  # half-written / corrupt report: skip it rather than 500 the whole list
+            continue
         out.append({"id": r["id"], "lat": r["lat"], "lng": r["lng"], "count": len(r["potholes"]), "ward": r.get("ward"), "status": r.get("status", "reported"), "upvotes": r.get("upvotes", 0),
                     "worst": max((p["score"] for p in r["potholes"]), default=0), "verdict": (r.get("verification") or {}).get("verdict"),
                     "followup_due": r.get("followup_due")})
@@ -110,9 +113,9 @@ def report(rid: str):
     f = pipeline.DATA / rid / "result.json"
     if not f.exists() or "/" in rid:
         raise HTTPException(404)
-    r = json.loads(f.read_text()); w = f.parent / "wonder.json"
+    r = json.loads(f.read_text(encoding="utf-8")); w = f.parent / "wonder.json"
     if w.exists() and (f.parent / "wonder_final.png").exists():
-        wj = json.loads(w.read_text()); r["wonder"] = {"screenshot": f"/media/{rid}/wonder_final.png", "submitted": wj.get("submitted"), "filled": wj.get("filled")}
+        wj = json.loads(w.read_text(encoding="utf-8")); r["wonder"] = {"screenshot": f"/media/{rid}/wonder_final.png", "submitted": wj.get("submitted"), "filled": wj.get("filled")}
     return r
 
 
@@ -129,7 +132,7 @@ def _load(rid: str) -> dict:
     f = pipeline.DATA / rid / "result.json"
     if "/" in rid or ".." in rid or not f.exists():
         raise HTTPException(404)
-    return json.loads(f.read_text())
+    return json.loads(f.read_text(encoding="utf-8"))
 
 
 @app.get("/reports/{rid}/coco")
@@ -164,10 +167,10 @@ def file_complaint(rid: str, req: FileReq):
             "Description": pipeline.clean_complaint(rep.get("body_en"))[:900], "Severity": worst}
     res = wonder_agent.fill_complaint(req.portal_url or "http://127.0.0.1:8000/mock-portal", data, pipeline.DATA / rid)
     res["screenshot"] = f"/media/{rid}/wonder_final.png"
-    (pipeline.DATA / rid / "wonder.json").write_text(json.dumps(res, indent=2, default=str))
+    (pipeline.DATA / rid / "wonder.json").write_text(json.dumps(res, indent=2, default=str), encoding="utf-8")
     if res.get("fields_filled", len(res.get("filled", {}))):
         r = _load(rid); r["status"] = "promised" if r.get("followup_due") else "filed"
-        (pipeline.DATA / rid / "result.json").write_text(json.dumps(r, ensure_ascii=False, indent=2, default=str))
+        pipeline.write_json(pipeline.DATA / rid / "result.json", r, ensure_ascii=False, indent=2, default=str)
     return res
 
 
@@ -249,14 +252,14 @@ def nearby(lat: float, lng: float, radius_m: float = 75):
 def upvote(rid: str):
     r = _load(rid)
     r["upvotes"] = r.get("upvotes", 0) + 1
-    (pipeline.DATA / rid / "result.json").write_text(json.dumps(r, ensure_ascii=False, indent=2))
+    pipeline.write_json(pipeline.DATA / rid / "result.json", r, ensure_ascii=False, indent=2)
     return {"id": rid, "upvotes": r["upvotes"]}
 
 
 @app.get("/followups")
 def followups():
     f = pipeline.DATA / "followups.json"
-    d = json.loads(f.read_text()) if f.exists() else {}
+    d = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
     return sorted([{"id": k, **v} for k, v in d.items()], key=lambda x: x["due"])
 
 
@@ -268,7 +271,7 @@ class Contact(BaseModel):
 @app.post("/reports/{rid}/contact")
 def set_contact(rid: str, c: Contact):
     r = _load(rid); r["contact"] = {"name": c.name.strip()[:80], "mobile": "".join(ch for ch in c.mobile if ch.isdigit())[:12]}
-    (pipeline.DATA / rid / "result.json").write_text(json.dumps(r, ensure_ascii=False, indent=2, default=str))
+    pipeline.write_json(pipeline.DATA / rid / "result.json", r, ensure_ascii=False, indent=2, default=str)
     return {"ok": True}
 
 
@@ -373,7 +376,7 @@ def escalation(rid: str):
     _load(rid); f = pipeline.DATA / rid / "escalation.json"
     if not f.exists():
         raise HTTPException(404, "no escalation drafted")
-    return json.loads(f.read_text())
+    return json.loads(f.read_text(encoding="utf-8"))
 
 
 @app.post("/rides/offline")

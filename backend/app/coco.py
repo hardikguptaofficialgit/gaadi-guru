@@ -27,7 +27,7 @@ def export(rids: list[str], every: int = 4) -> bytes:
     buf = io.BytesIO(); z = zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED)
     img_id = ann_id = 0
     for rid in rids:
-        out = pipeline.DATA / rid; res = json.loads((out / "result.json").read_text())
+        out = pipeline.DATA / rid; res = json.loads((out / "result.json").read_text(encoding="utf-8"))
         sev = {t: p for p in res["potholes"] for t in p.get("sam_tracks", [p.get("sam_track")])}
         privacy = {}
         for d in pipeline.load_dets(out, "privacy_"): privacy.setdefault(d.frame, []).append(d.box)
