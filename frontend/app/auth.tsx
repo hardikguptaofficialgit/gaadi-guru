@@ -21,11 +21,12 @@ export type Row = { id: string; ward?: string | null; city?: string | null; lat?
   repair_inr?: number | null; status?: string; authority_id?: string | null; sent_at?: string | null; claimed_from_device?: boolean };
 type Ctx = { enabled: boolean; ready: boolean; user: User | null; down: boolean; ids: string[] | null;
   sendLink: (email: string) => Promise<string | null>; google: () => Promise<string | null>; signOut: () => Promise<void>;
-  claim: (ids: string[]) => Promise<number>; save: (r: Row) => Promise<void>; refresh: () => Promise<void> };
+  claim: (ids: string[]) => Promise<Claim>; save: (r: Row) => Promise<void>; refresh: () => Promise<void> };
 const A = createContext<Ctx>({ enabled: false, ready: true, user: null, down: false, ids: null, sendLink: async () => "off", google: async () => "off",
-  signOut: async () => {}, claim: async () => 0, save: async () => {}, refresh: async () => {} });
+  signOut: async () => {}, claim: async () => ({ added: 0, missing: [], taken: [], error: null }), save: async () => {}, refresh: async () => {} });
 export const useAuth = () => useContext(A);
 
+export type Claim = { added: number; missing: string[]; taken: string[]; error: string | null };
 const err = (e: any) => e?.name === "AbortError" || /fetch|network|Failed/i.test(String(e?.message || e));
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -47,16 +48,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) setDown(err(error) || down); else setIds(v => v ? (v.includes(r.id) ? v : [r.id, ...v]) : [r.id]);
   }, [down]);
 
-  const claim = useCallback(async (list: string[]) => {
-    const s = supa(); if (!s || !list.length) return 0;
-    const { data } = await s.auth.getSession().catch(() => ({ data: { session: null } } as any)); if (!data.session) return 0;
+  // Claim on-device reports into the account. Returns exactly what happened so the UI can say why, not just "couldn't".
+  const claim = useCallback(async (list: string[]): Promise<Claim> => {
+    const res: Claim = { added: 0, missing: [], taken: [], error: null };
+    const s = supa(); if (!s || !list.length) return res;
+    const { data } = await s.auth.getSession().catch(() => ({ data: { session: null } } as any));
+    if (!data.session) return { ...res, error: "signed-out" };
     const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    const rows = await Promise.all(list.map(id => fetch(`${API}/reports/${id}`).then(x => x.ok ? x.json() : null).catch(() => null)));
-    const body = rows.filter(Boolean).map((r: any) => toRow(r, true));
-    if (!body.length) return 0;
-    const { error } = await s.from("reports").upsert(body.map(b => ({ ...b, user_id: data.session.user.id })), { onConflict: "id", ignoreDuplicates: true }).then(x => x, e => ({ error: e }));
-    if (error) { setDown(true); return 0; }
-    await refresh(); return body.length;
+    const chk = await fetch(`${API}/reports/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: list }) })
+      .then(x => x.ok ? x.json() : null).catch(() => null);
+    if (!chk) return { ...res, error: "server" };
+    res.missing = chk.missing || [];
+    if (res.missing.length) mine.drop(res.missing);  // ids whose report no longer exists on this server: stop offering them
+    const body = (chk.reports || []).map((r: any) => ({ ...toRow(r, true), user_id: data.session.user.id }));
+    if (!body.length) return res;
+    const { error } = await s.from("reports").upsert(body, { onConflict: "id", ignoreDuplicates: true }).then(x => x, e => ({ error: e }));
+    if (error) { if (err(error)) setDown(true); const m = String((error as any).message || error);
+      return { ...res, error: /row-level security|JWT|jwt|401|403/.test(m) ? "session" : /relation .* does not exist|schema cache/.test(m) ? "schema" : err(error) ? "account" : m }; }
+    const { data: got } = await s.from("reports").select("id").in("id", body.map((b: any) => b.id)).then(x => x, () => ({ data: null } as any));
+    const have = new Set((got || []).map((x: any) => x.id));
+    res.added = body.filter((b: any) => have.has(b.id)).length;
+    res.taken = body.filter((b: any) => !have.has(b.id)).map((b: any) => b.id);  // PK held by another account: RLS hides it, insert was skipped
+    if (res.taken.length) mine.drop(res.taken);
+    await refresh(); return res;
   }, [refresh]);
 
   useEffect(() => {

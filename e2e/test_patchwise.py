@@ -123,3 +123,22 @@ def test_claim_device_reports_after_login(page):
     expect(page.get_by_test_id("claim")).to_have_count(0)
     row = posted[0][0]
     assert row["id"] == RID and row["user_id"].endswith("0001") and row["claimed_from_device"] is True and "lat" in row
+
+
+def test_claim_skips_reports_missing_on_server(page):
+    """A stale on-device id (report deleted or corrupt on this server) must not block the claim; it is dropped with a specific message."""
+    if not SB: return
+    posted = []
+    def rest(r):
+        if r.request.method == "POST":
+            posted.append(json.loads(r.request.post_data)); return r.fulfill(status=201, json=[])
+        return r.fulfill(json=[{"id": x["id"]} for p in posted for x in p] if posted else [])
+    page.context.route(SB + "/rest/v1/reports**", rest)
+    page.context.route(SB + "/auth/v1/**", lambda r: r.fulfill(json={}))
+    page.context.add_init_script(_session_js().replace(f"['{RID}']", f"['{RID}','ghost0000x']"))
+    page.goto(WEB + "/mine")
+    c = page.get_by_test_id("claim"); expect(c).to_contain_text("2 reports")
+    c.get_by_role("button").click()
+    expect(page.get_by_text(re.compile("Added 1 report.*no longer exists on this server"))).to_be_visible()
+    assert [x["id"] for x in posted[0]] == [RID]
+    assert page.evaluate("JSON.parse(localStorage.getItem('mine'))") == [RID]

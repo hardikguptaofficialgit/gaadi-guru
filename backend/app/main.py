@@ -118,10 +118,7 @@ def reports():
 
 @app.get("/reports/{rid}")
 def report(rid: str):
-    f = pipeline.DATA / rid / "result.json"
-    if not f.exists() or "/" in rid:
-        raise HTTPException(404)
-    r = json.loads(f.read_text(encoding="utf-8")); w = f.parent / "wonder.json"
+    r = _load(rid); f = pipeline.DATA / rid / "result.json"; w = f.parent / "wonder.json"
     if w.exists() and (f.parent / "wonder_final.png").exists():
         wj = json.loads(w.read_text(encoding="utf-8")); r["wonder"] = {"screenshot": f"/media/{rid}/wonder_final.png", "submitted": wj.get("submitted"), "filled": wj.get("filled")}
     return r
@@ -136,11 +133,31 @@ def mock_portal():
     return FileResponse(STATIC / "mock_portal.html")
 
 
-def _load(rid: str) -> dict:
+def _read_result(rid: str) -> dict | None:
+    """result.json for a report id, or None when it is missing, empty or unreadable (e.g. a 0-byte or cp1252-mangled file)."""
+    if not rid or "/" in rid or "\\" in rid or ".." in rid:
+        return None
     f = pipeline.DATA / rid / "result.json"
-    if "/" in rid or ".." in rid or not f.exists():
-        raise HTTPException(404)
-    return json.loads(f.read_text(encoding="utf-8"))
+    try:
+        r = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return r if isinstance(r, dict) and r.setdefault("id", rid) == rid else None
+
+
+def _load(rid: str) -> dict:
+    r = _read_result(rid)
+    if r is None:
+        raise HTTPException(404, "report not found")
+    return r
+
+
+@app.post("/reports/check")
+def reports_check(body: dict):
+    """Which of these report ids still exist here? Used before claiming on-device reports into an account."""
+    ids = [str(x) for x in (body or {}).get("ids", [])][:200]
+    ok = {i: r for i in ids if (r := _read_result(i)) is not None}
+    return {"reports": list(ok.values()), "missing": [i for i in ids if i not in ok]}
 
 
 @app.get("/reports/{rid}/coco")
