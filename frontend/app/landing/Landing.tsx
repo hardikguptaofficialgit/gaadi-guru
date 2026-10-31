@@ -11,6 +11,7 @@ import { useT } from "../i18n";
 import Smooth from "./Smooth";
 import Icon from "./Icon";
 import { Brand } from "../Icon";
+import exampleReport from "../../public/example/report.json";
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 const HotMap = dynamic(() => import("../HotMap"), { ssr: false });
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -86,36 +87,33 @@ function Send() {
   </section>;
 }
 
-/** r7 hero: server-rendered example report (ISR 60s). Poster still paints first; the video only loads on hover, tap or idle. */
+/** Hero: pre-recorded example report from static JSON, poster WebP, and loop MP4. */
 const STATUS: Record<string, [string, string]> = { reported: ["Reported", "रिपोर्ट"], filed: ["Filed", "दर्ज"], promised: ["Awaiting repair", "मरम्मत बाकी"], fixed: ["Fixed", "ठीक"] };
-function Ticket({ f }: { f: any }) {
-  const L = useL(); const [vid, setVid] = useState(false); const reduce = useReducedMotion();
-  useEffect(() => { if (!f?.overlay || reduce) return; const w = window as any;
-    const id = w.requestIdleCallback ? w.requestIdleCallback(() => setVid(true), { timeout: 4000 }) : setTimeout(() => setVid(true), 2500);
-    return () => (w.cancelIdleCallback ? w.cancelIdleCallback(id) : clearTimeout(id)); }, [f?.overlay, reduce]);
-  const sk = !f; const d = (x: any) => sk ? <span className="sk-line" /> : x;
+function Ticket() {
+  const L = useL();
+  const f = exampleReport;
   return <div className="tk-wrap reveal" style={{ animationDelay: ".08s" }}>
     <div className="tk-label"><span className="eyebrow">{L("Example report", "उदाहरण रिपोर्ट")}</span><span>{L("What you get from a 30-second road video", "30 सेकंड के सड़क वीडियो से आपको क्या मिलता है")}</span></div>
-    <article className={"tk" + (sk ? " is-sk" : "")} aria-busy={sk} aria-label={L("Example Patchwise report", "Patchwise उदाहरण रिपोर्ट")}>
-      <header className="tk-h"><span className="mono-t">{sk ? "PW-··········" : `PW-${f.id}`}</span><span className="tk-st"><i />{sk ? "…" : (STATUS[f.status]?.[L("0", "1") === "0" ? 0 : 1] ?? f.status)}</span></header>
-      <div className="tk-media" onMouseEnter={() => setVid(true)} onClick={() => setVid(true)}>
-        {f?.poster && <img src={API + f.poster} width={640} height={360} alt={L("Pothole masks drawn by SAM 3.1 on a real ride", "असली राइड पर SAM 3.1 के गड्ढा निशान")} fetchPriority="high" decoding="async" />}
-        {vid && f?.overlay && <video src={API + f.overlay} poster={f.poster ? API + f.poster : undefined} preload="none" autoPlay muted loop playsInline aria-hidden />}
-        {!sk && <span className="tk-tag mono-t">SAM 3.1 · {L("frame", "फ्रेम")} {f.best_frame ?? "—"}</span>}
+    <article className="tk" aria-label={L("Example Patchwise report", "Patchwise उदाहरण रिपोर्ट")}>
+      <header className="tk-h"><span className="mono-t">{`PW-${f.id}`}</span><span className="tk-st"><i />{STATUS[f.status]?.[L("0", "1") === "0" ? 0 : 1] ?? f.status}</span></header>
+      <div className="tk-media">
+        <img src="/example/poster.webp" width={640} height={400} alt={L("Pothole masks drawn by SAM 3.1 on a real ride", "असली राइड पर SAM 3.1 के गड्ढा निशान")} fetchPriority="high" decoding="async" />
+        <video src="/example/clip.mp4" poster="/example/poster.webp" autoPlay muted loop playsInline preload="metadata" aria-hidden />
+        <span className="tk-tag mono-t">SAM 3.1 · {L("frame", "फ्रेम")} {f.best_frame ?? "—"}</span>
       </div>
       <dl className="tk-meta">
-        <div><dt>{L("Where", "जगह")}</dt><dd>{d(<>{f?.ward || "—"}<span className="mono-t mut"> {f?.lat?.toFixed(3)}, {f?.lng?.toFixed(3)}</span></>)}</dd></div>
-        <div><dt>{L("Found", "मिले")}</dt><dd>{d(<><b className="mono-t">{f?.count}</b> {L("potholes", "गड्ढे")}, {f?.dangerous} {L("dangerous", "खतरनाक")}; {L("largest", "सबसे बड़ा")} <span className="mono-t">{f?.top_m2} m²</span></>)}</dd></div>
-        <div><dt>{L("Fix, est.", "खर्च, अनुमान")}</dt><dd className="mono-t">{d(inr(f?.inr))}</dd></div>
-        <div><dt>{L("Routed to", "भेजा गया")}</dt><dd>{d(f?.authority || "—")}</dd></div>
-        <div><dt>{L("Re-check", "फिर जांच")}</dt><dd className="mono-t">{d(f?.followup_due || "—")}</dd></div>
+        <div><dt>{L("Where", "जगह")}</dt><dd>{f.ward || "—"}<span className="mono-t mut"> {f.lat?.toFixed(3)}, {f.lng?.toFixed(3)}</span></dd></div>
+        <div><dt>{L("Found", "मिले")}</dt><dd><b className="mono-t">{f.count}</b> {L("potholes", "गड्ढे")}, {f.dangerous} {L("dangerous", "खतरनाक")}; {L("largest", "सबसे बड़ा")} <span className="mono-t">{f.top_m2} m²</span></dd></div>
+        <div><dt>{L("Fix, est.", "खर्च, अनुमान")}</dt><dd className="mono-t">{inr(f.inr)}</dd></div>
+        <div><dt>{L("Routed to", "भेजा गया")}</dt><dd>{f.authority || "—"}</dd></div>
+        <div><dt>{L("Re-check", "फिर जांच")}</dt><dd className="mono-t">{f.followup_due || "—"}</dd></div>
       </dl>
-      <div className="tk-letter"><b>{d(f?.subject)}</b><p>{d(f?.excerpt)}</p></div>
-      <footer className="tk-f"><span>{L("Faces and plates blurred", "चेहरे व प्लेट धुंधले")}</span>{f && <Link href={`/report?id=${f.id}`} className="tk-open">{L("Open this report", "यह रिपोर्ट खोलें")}<Icon n="arrow" s={14} /></Link>}</footer>
+      <div className="tk-letter"><b>{f.subject}</b><p>{f.excerpt}</p></div>
+      <footer className="tk-f"><span>{L("Faces and plates blurred", "चेहरे व प्लेट धुंधले")}</span><Link href={`/report?id=${f.id}`} className="tk-open">{L("Open this report", "यह रिपोर्ट खोलें")}<Icon n="arrow" s={14} /></Link></footer>
     </article></div>;
 }
 
-function Hero({ f }: { f: any }) {
+function Hero() {
   const L = useL(); const s = useContext(S);
   return <section className="hx">
     <div className="hx-copy">
@@ -127,12 +125,15 @@ function Hero({ f }: { f: any }) {
         <Link href="/new" className="btn primary lg cta">{L("Report a road", "सड़क रिपोर्ट करें")}<Icon n="arrow" s={16} /></Link>
         <a href="#record" className="l-link">{L("How detection works", "पहचान कैसे होती है")}</a>
       </div>
-      <dl className="hx-nums reveal" style={{ animationDelay: ".15s" }}>
-        <div><dt>{L("Potholes mapped", "दर्ज गड्ढे")}</dt><dd className="mono-t">{s ? n(s.hazards) : "—"}</dd></div>
-        <div><dt>{L("Repair backlog", "मरम्मत बकाया")}</dt><dd className="mono-t">{s ? inr(s.inr_total) : "—"}</dd></div>
-        <div><dt>{L("Complaints filled", "शिकायतें भरी")}</dt><dd className="mono-t">{s ? `${s.filed}/${s.reports}` : "—"}</dd></div></dl>
     </div>
-    <Ticket f={f} />
+    <Ticket />
+    {s ? (
+      <dl className="hx-nums reveal" style={{ animationDelay: ".15s" }}>
+        <div><dt>{L("Potholes mapped", "दर्ज गड्ढे")}</dt><dd className="mono-t">{n(s.hazards)}</dd></div>
+        <div><dt>{L("Repair backlog", "मरम्मत बकाया")}</dt><dd className="mono-t">{inr(s.inr_total)}</dd></div>
+        <div><dt>{L("Complaints filled", "शिकायतें भरी")}</dt><dd className="mono-t">{`${s.filed}/${s.reports}`}</dd></div>
+      </dl>
+    ) : null}
   </section>;
 }
 
@@ -161,7 +162,7 @@ function Problem() {
 
 /** Drag to compare: privacy-blurred raw frame vs the SAM 3.1 mask on the same frame. */
 function Compare() {
-  const s = useContext(S); const f = s?.featured; const L = useL(); const [v, setV] = useState(50); const box = useRef<HTMLDivElement>(null); const drag = useRef(false);
+  const s = useContext(S); const f = s?.featured || exampleReport; const L = useL(); const [v, setV] = useState(50); const box = useRef<HTMLDivElement>(null); const drag = useRef(false);
   const at = (x: number) => { const r = box.current!.getBoundingClientRect(); setV(Math.max(0, Math.min(100, ((x - r.left) / r.width) * 100))); };
   if (!f) return null;
   return <section className="l-sec" id="record">
@@ -253,10 +254,10 @@ function CTA() {
   </section>;
 }
 
-export default function Landing({ featured = null }: { featured?: any }) {
-  const [s, setS] = useState<any>(null);
+export default function Landing({ initialStats = null }: { initialStats?: any }) {
+  const [s, setS] = useState<any>(initialStats);
   useEffect(() => { get("/stats").then(setS).catch(() => {}); }, []);
   useEffect(() => { if (s) requestAnimationFrame(() => ScrollTrigger.refresh()); }, [s]);
   return <MotionConfig reducedMotion="user"><S.Provider value={s}><Smooth />
-    <main className="wrap landing"><Hero f={featured} /><Problem /><Compare /><Send /><Agent /><Impact /><Privacy /><CTA /></main></S.Provider></MotionConfig>;
+    <main className="wrap landing"><Hero /><Problem /><Compare /><Send /><Agent /><Impact /><Privacy /><CTA /></main></S.Provider></MotionConfig>;
 }

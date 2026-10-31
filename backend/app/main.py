@@ -407,8 +407,11 @@ def _make_poster(rid: str, overlay: str, frame: int) -> None:
 @app.get("/featured")
 def featured():
     """Compact, cached 'example report' for the landing hero: one request, no video, poster still included."""
-    rs = agent.all_reports()
-    feat = max(rs, key=lambda r: (len(r["potholes"]), (pipeline.DATA / r["id"] / "agent.jsonl").exists()), default=None)
+    try:
+        rs = agent.all_reports()
+    except Exception:
+        return {"featured": None}
+    feat = max(rs, key=lambda r: (len(r.get("potholes") or []), (pipeline.DATA / r["id"] / "agent.jsonl").exists()), default=None)
     if not feat:
         return {"featured": None}
     key = (feat["id"], feat.get("status"), feat.get("followup_due"), len(feat["potholes"]))

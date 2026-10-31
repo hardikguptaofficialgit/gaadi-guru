@@ -15,11 +15,16 @@ def test_write_json_utf8_atomic(tmp_path, monkeypatch):
 
 
 def test_reports_skips_corrupt_file(client, rids, data):
+    from app import agent
     bad = data / "zz_corrupt"; bad.mkdir(exist_ok=True); (bad / "result.json").write_bytes(b"")
     try:
         r = client.get("/reports")
         assert r.status_code == 200
         assert {x["id"] for x in r.json()} == set(rids)
+        ar = agent.all_reports()
+        assert {x["id"] for x in ar} == set(rids)
+        feat = client.get("/featured")
+        assert feat.status_code == 200
     finally:
         shutil.rmtree(bad)
 

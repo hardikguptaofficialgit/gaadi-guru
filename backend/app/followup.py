@@ -37,9 +37,15 @@ def run_due(today: str | None = None, llm: bool = True, only: str | None = None)
             if fu.get("due", "9999") > today or fu.get("state") in ("closed", "escalated"):
                 continue
             f = DATA / rid / "result.json"
-            if not f.exists():
+            if not f.exists() or f.stat().st_size == 0:
                 fu["state"] = "closed"; fu["reason"] = "report missing"; continue
-            r = json.loads(f.read_text(encoding="utf-8")); v = (r.get("verification") or {}).get("verdict")
+            try:
+                r = json.loads(f.read_text(encoding="utf-8"))
+                if not isinstance(r, dict):
+                    raise ValueError("not a dict")
+            except Exception:
+                fu["state"] = "closed"; fu["reason"] = "report corrupt"; continue
+            v = (r.get("verification") or {}).get("verdict")
             fu["checked_at"] = dt.datetime.now().isoformat(timespec="seconds")
             if r.get("status") == "fixed" or v == "FIXED":
                 fu["state"] = "closed"; fu["reason"] = "verified fixed"; out.append({"id": rid, "action": "closed"}); continue

@@ -1,19 +1,19 @@
 import Landing from "./landing/Landing";
 import { API } from "./api";
 
-export const revalidate = 60; // ISR: the example report is server-rendered, refreshed at most once a minute
+export const revalidate = 60;
 
-async function getFeatured() {
+async function getStats() {
   try {
-    const r = await fetch(`${process.env.API_INTERNAL_URL || API}/featured`, { next: { revalidate: 60 }, signal: AbortSignal.timeout(2500) });
-    return r.ok ? (await r.json()).featured ?? null : null;
+    const r = await fetch(`${process.env.API_INTERNAL_URL || API}/stats`, { next: { revalidate: 60 }, signal: AbortSignal.timeout(2000) });
+    return r.ok ? await r.json() : null;
   } catch { return null; }
 }
 
 export default async function Home() {
-  const featured = await getFeatured();
+  const initialStats = await getStats();
   return <>
-    {featured?.poster && <link rel="preload" as="image" href={(process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000") + featured.poster} fetchPriority="high" />}
-    <Landing featured={featured} />
+    <link rel="preload" as="image" href="/example/poster.webp" fetchPriority="high" />
+    <Landing initialStats={initialStats} />
   </>;
 }

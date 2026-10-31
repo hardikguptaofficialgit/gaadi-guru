@@ -281,8 +281,14 @@ def video_hash(path: Path) -> str:
 
 def cached(vhash: str) -> dict | None:
     for f in DATA.glob("*/result.json"):
-        r = json.loads(f.read_text(encoding="utf-8"))
-        if r.get("video_hash") == vhash: return r
+        try:
+            if f.stat().st_size == 0:
+                continue
+            r = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if isinstance(r, dict) and r.get("video_hash") == vhash:
+            return r
     return None
 
 

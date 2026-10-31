@@ -27,7 +27,16 @@ def export(rids: list[str], every: int = 4) -> bytes:
     buf = io.BytesIO(); z = zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED)
     img_id = ann_id = 0
     for rid in rids:
-        out = pipeline.DATA / rid; res = json.loads((out / "result.json").read_text(encoding="utf-8"))
+        out = pipeline.DATA / rid
+        f = out / "result.json"
+        if not f.exists() or f.stat().st_size == 0:
+            continue
+        try:
+            res = json.loads(f.read_text(encoding="utf-8"))
+            if not isinstance(res, dict) or "potholes" not in res:
+                continue
+        except Exception:
+            continue
         sev = {t: p for p in res["potholes"] for t in p.get("sam_tracks", [p.get("sam_track")])}
         privacy = {}
         for d in pipeline.load_dets(out, "privacy_"): privacy.setdefault(d.frame, []).append(d.box)

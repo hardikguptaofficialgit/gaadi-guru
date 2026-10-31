@@ -33,10 +33,18 @@ actionable, non-duplicate municipal complaint and make sure it gets fixed. Work 
 
 
 def _load(rid: str) -> dict:
+    if not rid or "/" in rid or "\\" in rid or ".." in rid:
+        raise ValueError(f"invalid report id {rid}")
     f = DATA / rid / "result.json"
-    if "/" in rid or ".." in rid or not f.exists():
+    if not f.exists() or f.stat().st_size == 0:
         raise ValueError(f"unknown report {rid}")
-    return json.loads(f.read_text(encoding="utf-8"))
+    try:
+        r = json.loads(f.read_text(encoding="utf-8"))
+        if not isinstance(r, dict):
+            raise ValueError(f"unreadable report {rid}")
+        return r
+    except Exception as e:
+        raise ValueError(f"unreadable report {rid}: {e}") from e
 
 
 def _save(r: dict) -> None:
@@ -51,7 +59,17 @@ def _hav(a, b) -> float:
 
 
 def all_reports() -> list[dict]:
-    return [json.loads(f.read_text(encoding="utf-8")) for f in DATA.glob("*/result.json")]
+    out = []
+    for f in DATA.glob("*/result.json"):
+        try:
+            if f.stat().st_size == 0:
+                continue
+            r = json.loads(f.read_text(encoding="utf-8"))
+            if isinstance(r, dict) and "id" in r and "potholes" in r:
+                out.append(r)
+        except Exception:
+            continue
+    return out
 
 
 # ---------------- tools ----------------
