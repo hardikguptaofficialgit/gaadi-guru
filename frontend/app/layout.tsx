@@ -7,7 +7,7 @@ import { LangProvider } from "./i18n";
 import { ToastProvider } from "./ui";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-export const metadata = { metadataBase: new URL(SITE), title: "Gaadi Guru — report a bad road in one tap", description: "Meta SAM 3.1 + Muse Spark + Muse Wonder civic agent",
+export const metadata = { metadataBase: new URL(SITE), title: "Gaadi Guru: report a bad road in one tap", description: "Meta SAM 3.1 + Muse Spark + Muse Wonder civic agent",
   openGraph: { title: "Gaadi Guru", description: "Report a bad road in one tap. Faces and plates blurred." } };
 export const viewport = { width: "device-width", initialScale: 1 };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
