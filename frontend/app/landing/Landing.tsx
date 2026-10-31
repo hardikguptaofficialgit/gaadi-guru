@@ -234,7 +234,7 @@ function CTA() {
   const L = useL();
   return <section className="l-sec">
     <div className="l-cta">
-      <img src="/logo.svg" width={56} height={56} alt="" />
+      <img src="/brand/logo.svg" width={56} height={56} alt="" />
       <Lines lines={[L("Seen a bad road today?", "आज कोई खराब सड़क दिखी?")]} className="l-h2" />
       <motion.p variants={up} {...inView} className="l-sub">{L("It takes about a minute. The paperwork is on us.", "लगभग एक मिनट लगता है। कागज़ी काम हमारा।")}</motion.p>
       <Magnetic><Link href="/new" className="btn primary xl cta">{L("Report a road", "सड़क रिपोर्ट करें")}<Icon n="arrow" s={18} /></Link></Magnetic>

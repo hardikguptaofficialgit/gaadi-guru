@@ -11,15 +11,17 @@ export const contentType = "image/png";
 export const alt = "Patchwise road report";
 const SC: Record<string, [string, string]> = { CRITICAL: ["#f8e2e1", "#b23a36"], HIGH: ["#f9eada", "#a85d17"], MEDIUM: ["#f5eed2", "#7f6409"], LOW: ["#dcefe4", "#2d6e4c"] };
 const ST: Record<string, string> = { reported: "Reported", filed: "Complaint filed", promised: "Waiting for repair", fixed: "Fixed" };
+const logo = async () => "data:image/png;base64," + (await readFile(path.join(process.cwd(), "public/brand/icon-192.png"))).toString("base64");
 export default async function OG({ params }: { params: { id: string } }) {
+  const L = await logo();
   const r = await load(params.id);
-  if (!r) return new ImageResponse(<div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#eef0f3", fontSize: 64, fontWeight: 700, color: "#1c2230" }}>Patchwise</div>, size);
+  if (!r) return new ImageResponse(<div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 28, background: "#eef0f3", fontSize: 64, fontWeight: 700, color: "#1c2230" }}><img src={L} width={112} height={112} />Patchwise</div>, size);
   const s = summary(r); const inr = "₹" + Math.round(s.total).toLocaleString("en-IN");
   return new ImageResponse(
     <div style={{ width: "100%", height: "100%", display: "flex", background: "#eef0f3", padding: 48, gap: 40, fontFamily: "DV", color: "#1c2230" }}>
       <div style={{ display: "flex", flexDirection: "column", flex: 1, justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 30, fontWeight: 700 }}>
-          <div style={{ width: 52, height: 52, borderRadius: 14, background: "#3f6fd8", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30 }}>P</div>Patchwise</div>
+          <img src={L} width={52} height={52} />Patchwise</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ fontSize: 28, color: "#566072", display: "flex" }}>{s.ward}</div>
           <div style={{ fontSize: 68, fontWeight: 700, lineHeight: 1.04, letterSpacing: -3, display: "flex" }}>{`${s.n} road hazards reported`}</div>

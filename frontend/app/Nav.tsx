@@ -11,7 +11,7 @@ export default function Nav() {
   const on = (h: string) => path === h || path.startsWith(h + "/") || (h === "/new" && path === "/report");
   return <>
     <div className="nav"><div className="wrap"><div className="bar">
-      <Link href="/" className="logo"><img src="/logo.svg" alt="" width={32} height={32} /><span>Patchwise</span></Link>
+      <Link href="/" className="logo"><img src="/brand/logo.svg" alt="" width={32} height={32} /><span>Patchwise</span></Link>
       <nav className="links" aria-label="Main">{L.map(([h, k, i]) => <Link key={h} href={h} className={on(h) ? "on" : ""}>
         {on(h) && <motion.span layoutId="nav-bg" className="nav-bg" />}<Icon n={i} s={16} />{t(k)}</Link>)}</nav>
       <div className="row gap-1">{a.enabled && <Link href="/login" className="lang row gap-1" data-testid="account" aria-label={a.user ? "Account" : "Sign in"}>

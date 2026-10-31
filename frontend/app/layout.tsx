@@ -9,7 +9,7 @@ import { ToastProvider } from "./ui";
 import { AuthProvider } from "./auth";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-export const metadata = { metadataBase: new URL(SITE), title: "Patchwise: report a bad road in one tap", description: "Meta SAM 3.1 + Muse Spark + Muse Wonder civic agent",
+export const metadata = { icons: { icon: [{ url: "/icon.svg", type: "image/svg+xml" }, { url: "/brand/favicon.ico", sizes: "48x48" }], apple: "/brand/apple-touch-icon.png" }, manifest: "/manifest.webmanifest", metadataBase: new URL(SITE), title: "Patchwise: report a bad road in one tap", description: "Meta SAM 3.1 + Muse Spark + Muse Wonder civic agent",
   openGraph: { title: "Patchwise", description: "Report a bad road in one tap. Faces and plates blurred." } };
 export const viewport = { width: "device-width", initialScale: 1 };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
