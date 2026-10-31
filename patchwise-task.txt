@@ -1,0 +1,33 @@
+﻿PATCHWISE TASK r8 (landing hero). Repo: this folder. Next.js 14 frontend in frontend/, FastAPI backend in backend/.
+
+RULES:
+- Do not commit .env, .env.local, keys or backend/data.
+- No force-push. No hardcoded fake data: the hero example must come from a REAL existing report.
+- Do not call the Meta API. Tests use GG_FAKE_META=1.
+- Keep the design rules: light warm paper theme, pastel buttons, soft borders, no gradients, no glow, no emoji, Phosphor icons.
+
+1. CALMER FONT.
+   - Replace the Gloock display font everywhere (it feels loud and heavy).
+   - Use a calm, modern sans for headings and body, e.g. "Geist" or "Inter Tight" via next/font/google.
+   - Headings at weight 500-600, letter-spacing -0.02em, a softer size: the landing h1 should be about clamp(36px, 4.6vw, 56px).
+   - Keep JetBrains Mono for small labels/ids. Hindi fallback: Noto Sans Devanagari.
+
+2. HERO RIGHT SIDE: PRE-RECORDED, INSTANT.
+   - Do NOT fetch /featured at runtime for the hero (on the laptop it shows a grey skeleton and empty fields).
+   - Add a script, scripts/export_example.py, that takes a real report from backend/data (the newest valid one with potholes). It writes frontend/public/example/report.json (trimmed fields only), poster.webp (frame with pothole outlines) and clip.mp4 (a short muted loop, at most 6 s, under 1.5 MB, made with ffmpeg).
+   - Run it now and commit those files.
+   - Hero ticket reads them statically: import the JSON at build time, use the poster as the image with fixed width/height, and play the video autoplay muted loop playsinline preload=metadata, poster first.
+   - Keep the 'Example report' label.
+   - Also make the hero stats (potholes mapped, backlog, complaints) not show 0 while loading: render server-side or hide until loaded.
+
+3. FIT ABOVE THE FOLD.
+   - At 1366x768 and 1280x720 desktop, the whole hero, including the full ticket, must be visible without scrolling. Shrink the ticket (compact rows, smaller media aspect 16:10), reduce vertical paddings, and keep the stats row visible.
+   - On mobile, stack it with the ticket below the CTA.
+
+4. ROBUSTNESS. In backend/app/agent.py all_reports() and anything reading result.json: skip empty or unreadable files instead of crashing (this caused /featured 500).
+
+5. Small tap targets: the account button and the map zoom buttons should be at least 44px.
+
+TEST: run backend pytest with GG_FAKE_META=1 and the frontend build (npm run build) and make sure both pass.
+Commit with a clear message and git push to origin main.
+Write AGY_REPORT.md summarizing the changes, test results and the commit hash.

@@ -1,0 +1,40 @@
+Task r8 has been completed and pushed to `origin main`. All rules and requirements specified in [`patchwise-task.txt`](file:///C:/Users/hardi/projects/gaadi-guru/patchwise-task.txt) have been satisfied.
+
+### Summary of Completed Work
+
+1. **Calmer Typography**:
+   - Replaced `Gloock` display serif across the app with `Inter_Tight` via `next/font/google` for clean modern headings and body, `Noto_Sans_Devanagari` as Hindi fallback, and `JetBrains_Mono` for codes and labels in [`layout.tsx`](file:///C:/Users/hardi/projects/gaadi-guru/frontend/app/layout.tsx) and [`globals.css`](file:///C:/Users/hardi/projects/gaadi-guru/frontend/app/globals.css).
+   - Headings set to weight `550`, letter-spacing `-0.02em`, and landing `h1` scaled to `clamp(36px, 4.6vw, 56px)`.
+
+2. **Pre-recorded, Instant Hero Ticket**:
+   - Created [`scripts/export_example.py`](file:///C:/Users/hardi/projects/gaadi-guru/scripts/export_example.py) which exports the newest valid real report (`5fc13d67af` with 15 potholes) into static assets:
+     - [`frontend/public/example/report.json`](file:///C:/Users/hardi/projects/gaadi-guru/frontend/public/example/report.json) (558 B)
+     - [`frontend/public/example/poster.webp`](file:///C:/Users/hardi/projects/gaadi-guru/frontend/public/example/poster.webp) (41.3 KB, 16:10 frame with SAM pothole annotations)
+     - [`frontend/public/example/clip.mp4`](file:///C:/Users/hardi/projects/gaadi-guru/frontend/public/example/clip.mp4) (607 KB, 6s loop at 16:10, well under 1.5MB)
+   - Updated [`Landing.tsx`](file:///C:/Users/hardi/projects/gaadi-guru/frontend/app/landing/Landing.tsx) to import `report.json` statically at build time and render the video with `autoPlay muted loop playsInline preload="metadata"` with the poster image shown first.
+   - Retained the `'Example report'` label.
+   - Updated [`page.tsx`](file:///C:/Users/hardi/projects/gaadi-guru/frontend/app/page.tsx) to fetch `/stats` server-side and pass `initialStats` to avoid showing `0` while loading.
+
+3. **Fit Above the Fold & Mobile Stacking**:
+   - Compacted ticket rows and meta sections, capped media aspect ratio at 16:10 (`max-height: 185px`), and tuned hero paddings to guarantee that the hero, full ticket, and numbers/stats row are visible without scrolling at 1366x768 and 1280x720.
+   - On mobile screens (<= 900px), reordered elements via CSS flex order so the ticket is stacked directly beneath the CTA button.
+
+4. **Robustness Against Corrupted / Empty `result.json`**:
+   - Hardened `all_reports()` and `_load()` in [`agent.py`](file:///C:/Users/hardi/projects/gaadi-guru/backend/app/agent.py), [`pipeline.py`](file:///C:/Users/hardi/projects/gaadi-guru/backend/app/pipeline.py), [`followup.py`](file:///C:/Users/hardi/projects/gaadi-guru/backend/app/followup.py), [`coco.py`](file:///C:/Users/hardi/projects/gaadi-guru/backend/app/coco.py), and [`main.py`](file:///C:/Users/hardi/projects/gaadi-guru/backend/app/main.py) to skip 0-byte or unreadable files instead of throwing 500 errors.
+   - Added unit tests in [`test_encoding_and_cost.py`](file:///C:/Users/hardi/projects/gaadi-guru/backend/tests/test_encoding_and_cost.py).
+
+5. **Tap Targets**:
+   - Enforced `>= 44px` minimum touch targets on the account button (`.nav .acct`, `[data-testid=account]`) and the Leaflet map zoom buttons (`.leaflet-control-zoom a`, `.leaflet-bar a`).
+
+---
+
+### Verification & Deliverables
+
+- **Backend Tests:** `$env:GG_FAKE_META="1"; python -m pytest backend/tests`  
+  -> **67 passed, 1 skipped** in 21.01s.
+- **Frontend Build:** `npm --prefix frontend run build`  
+  -> **Compiled successfully** across all 16 static and dynamic routes with zero errors.
+- **Git Commit & Push:**
+  - Implementation Commit: [`15a895b`](https://github.com/hardikguptaofficialgit/gaadi-guru/commit/15a895b740ba0bda828f172a19ac3e3f40adb921)
+  - Pushed cleanly to `origin/main` (no force-push).
+- **Report File:** Detailed documentation written to [`AGY_REPORT.md`](file:///C:/Users/hardi/projects/gaadi-guru/AGY_REPORT.md).
